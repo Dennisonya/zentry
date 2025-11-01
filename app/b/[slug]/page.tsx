@@ -1,0 +1,55 @@
+import { notFound } from "next/navigation"
+import { getSupabaseServerClient } from "@/lib/supabase"
+import { BusinessPage } from "@/components/business-page"
+import { trackPageView } from "@/lib/analytics"
+
+interface PageProps {
+  params: Promise<{ slug: string }>
+}
+
+export default async function BusinessPageRoute({ params }: PageProps) {
+  const { slug } = await params
+  const supabase = getSupabaseServerClient()
+
+  // Fetch business data
+  const { data: business, error } = await supabase.from("businesses").select("*").eq("slug", slug).single()
+
+  if (error || !business) {
+    notFound()
+  }
+
+  // Fetch products for this business
+  const { data: products } = await supabase
+    .from("products")
+    .select("*")
+    .eq("business_id", business.id)
+    .eq("is_available", true)
+    .order("created_at", { ascending: false })
+
+  // Track page view (server-side)
+  await trackPageView(business.id)
+
+  return <BusinessPage business={business} products={products || []} />
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params
+  const supabase = getSupabaseServerClient()
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("business_name, description")
+    .eq("slug", slug)
+    .single()
+
+  if (!business) {
+    return {
+      title: "Business Not Found",
+    }
+  }
+
+  return {
+    title: `${business.business_name} - Zentry`,
+    description: business.description || `Visit ${business.business_name} online`,
+  }
+}
