@@ -50,6 +50,7 @@ export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
       return matchesSearch && matchesCategory
     })
   }, [businesses, searchQuery, selectedCategory])
+  console.log("filteredBusinesses", filteredBusinesses)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">

@@ -145,8 +145,8 @@ export default function OnboardingPage() {
         const fileExt = logoFile.name.split(".").pop()
         const fileName = `${user.id}-logo-${Date.now()}.${fileExt}`
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("business-logos")
-          .upload(`logos/${fileName}`, logoFile, {
+        .from("business-logos").
+        upload(`${fileName}`, logoFile, {
           contentType: logoFile.type,
           cacheControl: "3600",
           upsert: true,
@@ -156,8 +156,8 @@ export default function OnboardingPage() {
 
         const {
           data: { publicUrl },
-        } = supabase.storage.from("business-logos").getPublicUrl(`logos/${fileName}`)
-
+        } = supabase.storage.from("business-logos").getPublicUrl(`${fileName}`)
+        console.log("Public URL:", publicUrl)
         logoUrl = publicUrl
       }
 
@@ -166,20 +166,24 @@ export default function OnboardingPage() {
       if (heroFile) {
         const fileExt = heroFile.name.split(".").pop()
         const fileName = `${user.id}-hero-${Date.now()}.${fileExt}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
+      
+        const { data, error } = await supabase.storage
           .from("business-logos")
-          .upload(`heroes/${fileName}`, heroFile, {
-          contentType: heroFile.type,
-          cacheControl: "3600",
-          upsert: true,
-        })
-
-        if (uploadError) throw uploadError
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("business-logos").getPublicUrl(`heroes/${fileName}`)
-
+          .upload(`${fileName}`, heroFile, {
+            cacheControl: "3600",
+            upsert: true,
+            contentType: heroFile.type || "image/jpeg",
+          })
+      
+        if (error) {
+          console.error("Upload failed:", error)
+          throw error
+        }
+      
+        const { data: { publicUrl } } = supabase.storage
+          .from("business-logos")
+          .getPublicUrl(`${fileName}`)
+      
         heroUrl = publicUrl
       }
 

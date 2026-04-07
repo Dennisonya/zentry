@@ -11,10 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Zap, ArrowLeft, AlertCircle, CheckCircle, CheckCircle2 } from "lucide-react"
+import { Sparkles, ArrowLeft, AlertCircle, CheckCircle, CheckCircle2 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { LAYOUT_CONFIGS, type LayoutStyle } from "@/lib/layouts"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Business {
   id: string
@@ -102,10 +101,12 @@ export function SettingsContent({ business }: SettingsContentProps) {
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary-foreground" />
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold">InstantBiz</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              Zentry
+            </span>
           </div>
           <Link href="/dashboard">
             <Button variant="ghost" size="sm">
@@ -129,7 +130,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
           {success && (
             <Alert className="bg-green-50 text-green-900 border-green-200">
               <CheckCircle className="h-4 w-4" />
@@ -153,7 +153,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                   disabled={loading}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -164,7 +163,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                   rows={3}
                 />
               </div>
-
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
@@ -176,7 +174,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                     disabled={loading}
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -188,7 +185,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
                 <Input
@@ -201,7 +197,7 @@ export function SettingsContent({ business }: SettingsContentProps) {
             </CardContent>
           </Card>
 
-          {/* Social Media Integration */}
+          {/* Social Media */}
           <Card>
             <CardHeader>
               <CardTitle>Social Media Integration</CardTitle>
@@ -218,11 +214,8 @@ export function SettingsContent({ business }: SettingsContentProps) {
                   onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
                   disabled={loading}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Customers can order directly via WhatsApp. Include country code (e.g., +1 for US)
-                </p>
+                <p className="text-xs text-muted-foreground">Include country code (e.g. +234 for Nigeria)</p>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="instagram">Instagram Handle</Label>
                 <div className="flex items-center gap-2">
@@ -236,9 +229,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                     className="flex-1"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Add your Instagram handle without the @ symbol to show a follow button on your page
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -264,10 +254,10 @@ export function SettingsContent({ business }: SettingsContentProps) {
                       onClick={() => setFormData({ ...formData, layoutStyle: layout.id })}
                     >
                       <div className="flex items-start gap-2">
-                        <div className={`w-8 h-8 rounded ${layout.previewColor} flex items-center justify-center`}></div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{layout.name}</div>
-                          {layout.id === formData.layoutStyle && (
+                        <div className={`w-8 h-8 rounded ${layout.previewColor} flex-shrink-0`}></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{layout.name}</div>
+                          {formData.layoutStyle === layout.id && (
                             <CheckCircle2 className="h-4 w-4 text-primary mt-1" />
                           )}
                         </div>
@@ -298,7 +288,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="accentColor">Accent Color</Label>
                   <div className="flex items-center gap-2">

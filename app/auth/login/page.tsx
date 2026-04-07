@@ -26,20 +26,52 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const supabase = getSupabaseClient()
+      let supabase
+      try {
+        supabase = getSupabaseClient()
+      } catch (configError: any) {
+        // Catch configuration errors (missing/invalid env vars)
+        console.error("Supabase configuration error:", configError)
+        setError(
+          configError.message || 
+          "Configuration error: Please check your Supabase environment variables in .env.local"
+        )
+        setLoading(false)
+        return
+      }
+
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (loginError) throw loginError
+      if (loginError) {
+        // Handle specific Supabase auth errors
+        if (loginError.message?.includes("Invalid API key") || loginError.message?.includes("api key")) {
+          setError(
+            "Invalid API key. Please check your NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local. " +
+            "Make sure you're using the 'anon' or 'public' key from your Supabase project settings."
+          )
+        } else if (loginError.message?.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please try again.")
+        } else {
+          setError(loginError.message || "An error occurred during login")
+        }
+        setLoading(false)
+        return
+      }
 
-      if (data.user) {
-        router.push("/dashboard")
+      if (data.user && data.session) {
+        // Session is automatically persisted by Supabase client
+        // Use window.location for a full page reload to ensure session is recognized
+        window.location.href = "/dashboard"
+      } else {
+        setError("Login failed. Please try again.")
+        setLoading(false)
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during login")
-    } finally {
+      console.error("Login error:", err)
+      setError(err.message || "An unexpected error occurred during login")
       setLoading(false)
     }
   }

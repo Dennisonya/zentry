@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Phone, Mail, MapPin, MessageCircle, Instagram, ShoppingCart } from "lucide-react"
-import { OrderDialog } from "@/components/order-dialog"
+import { EnhancedOrderDialog } from "@/components/enhanced-order-dialog"
+import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
 import { useState } from "react"
 
 interface Business {
@@ -20,6 +21,7 @@ interface Business {
   accent_color?: string | null
   whatsapp_number: string | null
   instagram_handle: string | null
+  hero_image_url: string | null
 }
 
 interface Product {
@@ -31,14 +33,28 @@ interface Product {
   category: string | null
 }
 
+interface Service {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  image_url: string | null
+  category: string | null
+  duration_minutes: number | null
+  location: string | null
+}
+
 interface ModernSplitLayoutProps {
   business: Business
   products: Product[]
+  services: Service[]
 }
 
-export function ModernSplitLayout({ business, products }: ModernSplitLayoutProps) {
+export function ModernSplitLayout({ business, products, services }: ModernSplitLayoutProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
 
   const handleOrderClick = (product: Product) => {
     setSelectedProduct(product)
@@ -114,49 +130,117 @@ export function ModernSplitLayout({ business, products }: ModernSplitLayoutProps
       {/* Right Content */}
       <div className="md:w-2/3 flex-1">
         <div className="p-8">
-          {products.length === 0 ? (
+          {products.length === 0 && services.length === 0 ? (
             <div className="text-center py-20">
               <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">No products yet</h2>
+              <h2 className="text-2xl font-semibold mb-2">No offerings yet</h2>
               <p className="text-muted-foreground">Check back soon for new items!</p>
             </div>
           ) : (
             <>
-              <h2 className="text-3xl font-bold mb-8">Menu / Products</h2>
-              <div className="grid sm:grid-cols-2 gap-6">
-                {products.map((product) => (
-                  <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all">
-                    {product.image_url && (
-                      <div className="aspect-video overflow-hidden bg-muted">
-                        <img src={product.image_url || "/placeholder.svg"} alt={product.name} className="h-full w-full object-cover hover:scale-110 transition-transform duration-300" />
-                      </div>
-                    )}
-                    <CardContent className="p-6">
-                      {product.category && (
-                        <Badge variant="secondary" className="mb-2">
-                          {product.category}
-                        </Badge>
-                      )}
-                      <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
-                      {product.description && <p className="text-muted-foreground mb-4">{product.description}</p>}
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold" style={{ color: accentColor }}>
-                          ${product.price.toFixed(2)}
-                        </span>
-                        {business.whatsapp_number ? (
-                          <Button size="sm" onClick={() => handleWhatsAppOrder(product)} style={{ backgroundColor: accentColor }}>
-                            Order
-                          </Button>
-                        ) : (
-                          <Button size="sm" onClick={() => handleOrderClick(product)} style={{ backgroundColor: accentColor }}>
-                            Order
-                          </Button>
+              <h2 className="text-3xl font-bold mb-8">Menu / Products & Services</h2>
+
+              {products.length > 0 && (
+                <div className="mb-10">
+                  <h3 className="text-2xl font-semibold mb-4">Products</h3>
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    {products.map((product) => (
+                      <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-all">
+                        {product.image_url && (
+                          <div className="aspect-video overflow-hidden bg-muted">
+                            <img
+                              src={product.image_url || "/placeholder.svg"}
+                              alt={product.name}
+                              className="h-full w-full object-cover hover:scale-110 transition-transform duration-300"
+                            />
+                          </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        <CardContent className="p-6">
+                          {product.category && (
+                            <Badge variant="secondary" className="mb-2">
+                              {product.category}
+                            </Badge>
+                          )}
+                          <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
+                          {product.description && <p className="text-muted-foreground mb-4">{product.description}</p>}
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-bold" style={{ color: accentColor }}>
+                              ${product.price.toFixed(2)}
+                            </span>
+                            {business.whatsapp_number ? (
+                              <Button
+                                size="sm"
+                                onClick={() => handleWhatsAppOrder(product)}
+                                style={{ backgroundColor: accentColor }}
+                              >
+                                Order
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => handleOrderClick(product)}
+                                style={{ backgroundColor: accentColor }}
+                              >
+                                Order
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {services.length > 0 && (
+                <div>
+                  <h3 className="text-2xl font-semibold mb-4">Services</h3>
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    {services.map((service) => (
+                      <Card key={service.id} className="overflow-hidden hover:shadow-xl transition-all">
+                        {service.image_url && (
+                          <div className="aspect-video overflow-hidden bg-muted">
+                            <img
+                              src={service.image_url || "/placeholder.svg"}
+                              alt={service.name}
+                              className="h-full w-full object-cover hover:scale-110 transition-transform duration-300"
+                            />
+                          </div>
+                        )}
+                        <CardContent className="p-6">
+                          {service.category && (
+                            <Badge variant="secondary" className="mb-2">
+                              {service.category}
+                            </Badge>
+                          )}
+                          <h3 className="text-xl font-semibold mb-2">{service.name}</h3>
+                          {service.description && <p className="text-muted-foreground mb-4">{service.description}</p>}
+                          <div className="text-sm text-muted-foreground mb-4">
+                            {service.duration_minutes != null ? `${service.duration_minutes} min` : null}
+                            {service.duration_minutes != null && service.location ? " • " : null}
+                            {service.location ? service.location : null}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-bold" style={{ color: accentColor }}>
+                              ${service.price.toFixed(2)}
+                            </span>
+                            <Button
+                              size="sm"
+                              style={{ backgroundColor: accentColor }}
+                              onClick={() => {
+                                setSelectedService(service)
+                                setServiceInquiryOpen(true)
+                              }}
+                            >
+                              Book
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -179,7 +263,7 @@ export function ModernSplitLayout({ business, products }: ModernSplitLayoutProps
 
       {/* Order Dialog */}
       {selectedProduct && (
-        <OrderDialog
+        <EnhancedOrderDialog
           open={orderDialogOpen}
           onOpenChange={setOrderDialogOpen}
           product={selectedProduct}
@@ -187,6 +271,17 @@ export function ModernSplitLayout({ business, products }: ModernSplitLayoutProps
           businessName={business.business_name}
         />
       )}
+
+      <ServiceInquiryDialog
+        open={serviceInquiryOpen}
+        onOpenChange={setServiceInquiryOpen}
+        businessId={business.id}
+        businessName={business.business_name}
+        serviceId={selectedService?.id ?? null}
+        serviceName={selectedService?.name ?? null}
+        whatsappNumber={business.whatsapp_number}
+        instagramHandle={business.instagram_handle}
+      />
     </div>
   )
 }

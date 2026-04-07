@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+
+<div className="grid gap-4 md:gap-6">
+          {/* Instant Business Page - Full Width */}
+          <div className="rounded-2xl bg-[#1a1f2e] p-6 sm:p-8 text-white">
+            <h3 className="text-xl sm:text-2xl font-semibold mb-2">
+              Instant Business Page
+            </h3>
+            <p className="text-white/70 text-sm sm:text-base mb-6 max-w-md">
+              Create a clean, shareable business profile in minutes no coding
+              needed.
+            </p>
+            <Link
+              href="#"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-[#1a1f2e] hover:bg-white/90 transition-colors"

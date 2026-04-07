@@ -31,11 +31,30 @@ export interface Product {
   category: string | null
 }
 
+export interface Service {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  image_url: string | null
+  category: string | null
+  duration_minutes: number | null
+  location: string | null
+}
+
 interface BusinessPageProps {
   business: Business
   products: Product[]
+  services: Service[]
 }
 
-export function BusinessPage({ business, products }: BusinessPageProps) {
-  return <BusinessPageWithLayout business={business} products={products} layoutStyle={business.layout_style} />
+export function BusinessPage({ business, products, services }: BusinessPageProps) {
+  return (
+    <BusinessPageWithLayout
+      business={business}
+      products={products}
+      services={services}
+      layoutStyle={business.layout_style}
+    />
+  )
 }

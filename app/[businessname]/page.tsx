@@ -26,10 +26,18 @@ export default async function BusinessPageRoute({ params }: PageProps) {
     .eq("is_available", true)
     .order("created_at", { ascending: false })
 
+  // Fetch services for this business
+  const { data: services } = await supabase
+    .from("services")
+    .select("*")
+    .eq("business_id", business.id)
+    .eq("is_available", true)
+    .order("created_at", { ascending: false })
+
   // Track page view (server-side)
   await trackPageView(business.id)
 
-  return <BusinessPage business={business} products={products || []} />
+  return <BusinessPage business={business} products={products || []} services={services || []} />
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -49,7 +57,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   return {
-    title: `${business.business_name} - Zentry`,
+    title: `${business.business_name} - Products & Services - Zentry`,
     description: business.description || `Visit ${business.business_name} online`,
   }
 }

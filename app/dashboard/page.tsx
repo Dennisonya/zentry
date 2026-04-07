@@ -1,18 +1,19 @@
-
 "use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from "@/lib/supabase"
 import { DashboardContent } from "@/components/dashboard-content"
+import type { Business as DashboardBusiness } from "@/components/dashboard-content"
 import type { User } from "@supabase/supabase-js"
 
 export default function DashboardPage() {
   const router = useRouter()
   const [loading, setLoading] = useState<boolean>(true)
   const [user, setUser] = useState<User | null>(null)
-  const [business, setBusiness] = useState<any | null>(null)
+  const [business, setBusiness] = useState<DashboardBusiness | null>(null)
   const [products, setProducts] = useState<any[]>([])
+  const [services, setServices] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
   const [totalViews, setTotalViews] = useState<number>(0)
 
@@ -26,36 +27,42 @@ export default function DashboardPage() {
       }
       setUser(user)
 
-      // Get user's business
-      const { data: business } = await supabase.from("businesses").select("*").eq("user_id", user.id).single()
-      if (!business) {
+      const { data: businessRow } = await supabase.from("businesses").select("*").eq("user_id", user.id).single()
+      if (!businessRow) {
         router.replace("/onboarding")
         return
       }
-      setBusiness(business)
+      const biz = businessRow as DashboardBusiness
+      setBusiness(biz)
 
-      // Get products
+      // Get products / services
       const { data: products } = await supabase
         .from("products")
         .select("*")
-        .eq("business_id", business.id)
+        .eq("business_id", biz.id)
         .order("created_at", { ascending: false })
       setProducts(products || [])
 
-      // Get orders
+      const { data: services } = await supabase
+        .from("services")
+        .select("*")
+        .eq("business_id", biz.id)
+        .order("created_at", { ascending: false })
+      setServices(services || [])
+
+      // Get orders / bookings — no limit so all are visible
       const { data: orders } = await supabase
         .from("orders")
         .select("*")
-        .eq("business_id", business.id)
+        .eq("business_id", biz.id)
         .order("created_at", { ascending: false })
-        .limit(10)
       setOrders(orders || [])
 
       // Get analytics
       const { count: totalViews } = await supabase
         .from("page_views")
         .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id)
+        .eq("business_id", biz.id)
       setTotalViews(totalViews || 0)
 
       setLoading(false)
@@ -73,9 +80,10 @@ export default function DashboardPage() {
   return (
     <DashboardContent
       business={business}
-      products={products || []} 
+      products={products || []}
+      services={services || []}
       orders={orders || []}
-      totalViews={totalViews||0}
+      totalViews={totalViews || 0}
     />
   )
 }

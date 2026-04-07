@@ -23,6 +23,7 @@ export interface Business {
   accent_color?: string | null
   whatsapp_number: string | null
   instagram_handle: string | null
+  hero_image_url: string | null
 }
 
 export interface Product {
@@ -32,6 +33,17 @@ export interface Product {
   price: number
   image_url: string | null
   category: string | null
+}
+
+export interface Service {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  image_url: string | null
+  category: string | null
+  duration_minutes: number | null
+  location: string | null
 }
 
 const layoutComponents = {
@@ -48,11 +60,17 @@ const layoutComponents = {
 interface BusinessPageWithLayoutProps {
   business: Business
   products: Product[]
+  services: Service[]
   layoutStyle?: LayoutStyle
 }
 
-export function BusinessPageWithLayout({ business, products, layoutStyle = "classic-card" }: BusinessPageWithLayoutProps) {
+export function BusinessPageWithLayout({
+  business,
+  products,
+  services,
+  layoutStyle = "classic-card",
+}: BusinessPageWithLayoutProps) {
   const LayoutComponent = layoutComponents[layoutStyle] || ClassicCardLayout
-  return <LayoutComponent business={business} products={products} />
+  return <LayoutComponent business={business} products={products} services={services} />
 }
 

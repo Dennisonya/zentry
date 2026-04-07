@@ -34,6 +34,53 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Create services table
+CREATE TABLE IF NOT EXISTS services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+
+  name TEXT NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2) NOT NULL,
+
+  image_url TEXT,
+  category TEXT,
+
+  duration_minutes INTEGER, -- e.g. 30, 60, 90
+  location TEXT, -- "online", "in-person", or address
+
+  is_available BOOLEAN DEFAULT true,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+--Create bookings table
+CREATE TABLE IF NOT EXISTS bookings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  business_id UUID NOT NULL 
+    REFERENCES businesses(id) ON DELETE CASCADE,
+
+  service_id UUID 
+    REFERENCES services(id) ON DELETE SET NULL,
+
+  customer_name TEXT NOT NULL,
+  customer_email TEXT,
+  customer_phone TEXT,
+
+  booking_date DATE NOT NULL,
+  booking_time TIME NOT NULL,
+
+  status TEXT DEFAULT 'pending', 
+  -- pending | confirmed | cancelled | completed
+
+  notes TEXT,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create page_views table for analytics
 CREATE TABLE IF NOT EXISTS page_views (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,6 +92,8 @@ CREATE TABLE IF NOT EXISTS page_views (
   viewed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+
+
 -- Create orders table
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,7 +104,9 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount DECIMAL(10, 2) NOT NULL,
   status TEXT DEFAULT 'pending',
   order_items JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  delivery_address TEXT,
+  additional_notes TEXT
 );
 
 -- Enable Row Level Security
@@ -63,7 +114,8 @@ ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE page_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for businesses
 CREATE POLICY "Users can view their own businesses" ON businesses
   FOR SELECT USING (auth.uid() = user_id);
@@ -113,9 +165,40 @@ CREATE POLICY "Business owners can view their orders" ON orders
 CREATE POLICY "Anyone can create orders" ON orders
   FOR INSERT WITH CHECK (true);
 
+-- RLS Policies for services
+CREATE POLICY "Business owners can manage their services" ON services
+  FOR ALL USING (
+    business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Anyone can view available services" ON services
+  FOR SELECT USING (is_available = true);
+
+-- RLS Policies for bookings
+CREATE POLICY "Business owners can view their bookings" ON bookings
+  FOR SELECT USING (
+    business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Business owners can update their bookings" ON bookings
+  FOR UPDATE USING (
+    business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Anyone can create bookings" ON bookings
+  FOR INSERT WITH CHECK (true);
+
 -- Create indexes for better performance
 CREATE INDEX idx_businesses_user_id ON businesses(user_id);
 CREATE INDEX idx_businesses_slug ON businesses(slug);
 CREATE INDEX idx_products_business_id ON products(business_id);
 CREATE INDEX idx_page_views_business_id ON page_views(business_id);
 CREATE INDEX idx_orders_business_id ON orders(business_id);
+CREATE INDEX idx_bookings_business_id ON bookings(business_id);
+CREATE INDEX idx_services_business_id ON services(business_id);

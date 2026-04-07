@@ -7,3 +7,8 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS initial_products JSONB;
 -- Update RLS policy to allow public viewing of all businesses for marketplace
 CREATE POLICY IF NOT EXISTS "Anyone can view all businesses for marketplace" ON businesses
   FOR SELECT USING (true);
+
+ALTER TABLE bookings
+ADD COLUMN booking_date DATE,
+ADD COLUMN booking_time TIME,
+ADD COLUMN notes TEXT;

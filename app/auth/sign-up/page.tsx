@@ -20,10 +20,12 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [existingUser, setExistingUser] = useState(false)
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setExistingUser(false)
 
     if (password !== confirmPassword) {
       setError("Passwords do not match")
@@ -52,7 +54,15 @@ export default function SignUpPage() {
 
       console.log('Signup response:', { data, error: signUpError })
 
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        const isExistingUser = signUpError.message?.toLowerCase().includes("user already registered") || signUpError.status === 400
+        if (isExistingUser) {
+          setExistingUser(true)
+          setError("Looks like you already have an account with this email.")
+          return
+        }
+        throw signUpError
+      }
 
       if (data.user) {
         router.push("/auth/sign-up-success")
@@ -83,7 +93,18 @@ export default function SignUpPage() {
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="space-y-2">
+                  <p>{error}</p>
+                  {existingUser && (
+                    <p>
+                      Already signed up?{" "}
+                      <Link href="/auth/login" className="underline">
+                        Go to the login page
+                      </Link>
+                      .
+                    </p>
+                  )}
+                </AlertDescription>
               </Alert>
             )}
 

@@ -24,6 +24,8 @@ interface ServiceInquiryDialogProps {
   onOpenChange: (open: boolean) => void
   businessId: string
   businessName: string
+  serviceId?: string | null
+  serviceName?: string | null
   whatsappNumber: string | null
   instagramHandle: string | null
 }
@@ -33,6 +35,8 @@ export function ServiceInquiryDialog({
   onOpenChange,
   businessId,
   businessName,
+  serviceId = null,
+  serviceName = null,
   whatsappNumber,
   instagramHandle,
 }: ServiceInquiryDialogProps) {
@@ -58,36 +62,57 @@ export function ServiceInquiryDialog({
       // Get customer's WhatsApp number
       const customerWhatsApp = formData.whatsapp.replace(/[^0-9]/g, "")
 
-      // Build the inquiry message
-      let inquiryMessage = `✨ New Service Inquiry (Zentry)\n\n`
-      inquiryMessage += `Name: ${formData.name}\n`
-      inquiryMessage += `Contact: ${formData.whatsapp}\n`
-      if (formData.preferredDate) {
-        inquiryMessage += `Preferred Date: ${formData.preferredDate}\n`
-      }
-      if (formData.location) {
-        inquiryMessage += `Location: ${formData.location}\n`
-      }
-      if (formData.message) {
-        inquiryMessage += `Message: ${formData.message}\n`
-      }
-      inquiryMessage += `\n📍 From your Zentry page.`
+      const now = new Date()
+      const pad2 = (n: number) => String(n).padStart(2, "0")
+      const formatDateLocal = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+      const formatTimeLocal = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 
-      // Create order/inquiry record in database
-      const { error: insertError } = await supabase.from("orders").insert({
+      // Attempt a best-effort parse; if we can't, default to "now" and store the original text in notes.
+      let parsedDate: Date | null = null
+      if (formData.preferredDate.trim()) {
+        const raw = formData.preferredDate.trim()
+        const lower = raw.toLowerCase()
+        if (lower.includes("tomorrow")) {
+          const tomorrow = new Date(now)
+          tomorrow.setDate(now.getDate() + 1)
+
+          // Try to extract a time like "3pm" / "3:30pm" / "14:30".
+          const timeMatch = raw.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i)
+          if (timeMatch) {
+            let h = Number(timeMatch[1])
+            const m = timeMatch[2] ? Number(timeMatch[2]) : 0
+            const ampm = timeMatch[3]?.toLowerCase()
+            if (ampm === "pm" && h < 12) h += 12
+            if (ampm === "am" && h === 12) h = 0
+            tomorrow.setHours(h, m, 0, 0)
+          }
+          parsedDate = tomorrow
+        } else {
+          const d = new Date(raw)
+          if (!Number.isNaN(d.getTime())) parsedDate = d
+        }
+      }
+
+      const bookingDate = formatDateLocal(parsedDate ?? now)
+      const bookingTime = formatTimeLocal(parsedDate ?? now)
+
+      const notesParts: string[] = []
+      if (formData.preferredDate) notesParts.push(`Preferred: ${formData.preferredDate}`)
+      if (serviceName) notesParts.push(`Service: ${serviceName}`)
+      if (formData.location) notesParts.push(`Location: ${formData.location}`)
+      if (formData.message) notesParts.push(`Message: ${formData.message}`)
+      const notes = notesParts.length ? notesParts.join("\n") : null
+
+      // Create booking/inquiry record in database
+      const { error: insertError } = await supabase.from("bookings").insert({
         business_id: businessId,
         customer_name: formData.name,
-        customer_phone: formData.whatsapp,
-        total_amount: 0, // Services don't have fixed pricing upfront
+        customer_phone: customerWhatsApp,
+        service_id: serviceId,
+        booking_date: bookingDate,
+        booking_time: bookingTime,
         status: "inquiry",
-        order_items: [
-          {
-            service_inquiry: true,
-            message: formData.message,
-            preferred_date: formData.preferredDate,
-            location: formData.location,
-          },
-        ],
+        notes,
       })
 
       if (insertError) throw insertError

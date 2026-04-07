@@ -5,11 +5,24 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Zap, ExternalLink, Plus, Package, ShoppingBag, TrendingUp, LogOut, Settings, Copy, Check } from "lucide-react"
+import {
+  Sparkles,
+  ExternalLink,
+  Plus,
+  Package,
+  ShoppingBag,
+  TrendingUp,
+  LogOut,
+  Settings,
+  Copy,
+  Check,
+  Calendar,
+  Tag,
+  Users,
+} from "lucide-react"
 import { AddProductDialog } from "@/components/add-product-dialog"
 import { ProductList } from "@/components/product-list"
-import { OrderList } from "@/components/order-list"
+import { ServiceList } from "@/components/service-list"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getSupabaseClient } from "@/lib/supabase"
 
@@ -18,6 +31,7 @@ export interface Business {
   business_name: string
   slug: string
   business_type: string
+  business_type_mode?: string
   phone: string | null
   email: string | null
   address: string | null
@@ -36,6 +50,18 @@ export interface Product {
   is_available: boolean
 }
 
+export interface Service {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  image_url: string | null
+  category: string | null
+  duration_minutes: number | null
+  location: string | null
+  is_available: boolean
+}
+
 export interface Order {
   id: string
   customer_name: string
@@ -50,14 +76,17 @@ export interface Order {
 interface DashboardContentProps {
   business: Business
   products: Product[]
+  services: Service[]
   orders: Order[]
   totalViews: number
 }
 
-export function DashboardContent({ business, products, orders, totalViews }: DashboardContentProps) {
+export function DashboardContent({ business, products, services, orders, totalViews }: DashboardContentProps) {
   const router = useRouter()
   const [addProductOpen, setAddProductOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const isServiceBusiness = business.business_type_mode === "service"
 
   const businessUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${business.slug}`
 
@@ -73,16 +102,28 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Revenue from orders (exclude cancelled)
+  const totalRevenue = orders
+    .filter((o) => o.status !== "cancelled")
+    .reduce((sum, order) => sum + Number(order.total_amount), 0)
+
+  // For service businesses, active bookings = confirmed + pending
+  const activeBookings = orders.filter((o) =>
+    ["pending", "confirmed", "rescheduled", "inquiry"].includes(o.status)
+  ).length
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Zap className="h-5 w-5 text-primary-foreground" />
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold">InstantBiz</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              Zentry
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/dashboard/analytics">
@@ -110,7 +151,7 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
         {/* Business Info */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">{business.business_name}</h1>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-md">
               <span className="font-mono">{businessUrl}</span>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={handleCopyLink}>
@@ -123,6 +164,30 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
                 Settings
               </Button>
             </Link>
+            <Link href="/dashboard/promotions">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <Tag className="h-4 w-4 mr-2" />
+                Promotions
+              </Button>
+            </Link>
+            <Link href="/dashboard/bookings">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <Calendar className="h-4 w-4 mr-2" />
+                Bookings
+              </Button>
+            </Link>
+            <Link href="/dashboard/orders">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <ShoppingBag className="h-4 w-4 mr-2" />
+                Orders
+              </Button>
+            </Link>
+            <Link href="/dashboard/customers">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <Users className="h-4 w-4 mr-2" />
+                Customers
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -130,7 +195,9 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {isServiceBusiness ? "Total Services" : "Total Products"}
+              </CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -139,11 +206,19 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                {isServiceBusiness ? "Active Bookings" : "Total Orders"}
+              </CardTitle>
+              {isServiceBusiness ? (
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              )}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{orders.length}</div>
+              <div className="text-2xl font-bold">
+                {isServiceBusiness ? activeBookings : orders.length}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -161,52 +236,61 @@ export function DashboardContent({ business, products, orders, totalViews }: Das
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                ${orders.reduce((sum, order) => sum + Number(order.total_amount), 0).toFixed(2)}
-              </div>
+              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="products" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="products" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Products</CardTitle>
-                    <CardDescription>Manage your product catalog</CardDescription>
-                  </div>
-                  <Button onClick={() => setAddProductOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
+        {/* Products + services */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Products</CardTitle>
+                  <CardDescription>
+                    Manage your product catalog. Use{" "}
+                    <Link href="/dashboard/orders" className="text-primary underline-offset-4 hover:underline">
+                      Orders
+                    </Link>{" "}
+                    for incoming product requests.
+                  </CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <ProductList products={products} businessId={business.id} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ProductList products={products} businessId={business.id} />
+            </CardContent>
+          </Card>
 
-          <TabsContent value="orders" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Orders</CardTitle>
-                <CardDescription>View and manage customer orders</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <OrderList orders={orders} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Services</CardTitle>
+                  <CardDescription>
+                    Manage your service offerings. Use{" "}
+                    <Link href="/dashboard/bookings" className="text-primary underline-offset-4 hover:underline">
+                      Bookings
+                    </Link>{" "}
+                    for incoming service requests.
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ServiceList services={services} businessId={business.id} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <AddProductDialog open={addProductOpen} onOpenChange={setAddProductOpen} businessId={business.id} />
