@@ -140,8 +140,11 @@ export function SettingsContent({ business }: SettingsContentProps) {
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Update your business details</CardDescription>
+              <CardTitle>Storefront Information</CardTitle>
+              <CardDescription>
+                Public business details shown on your storefront. Your personal profile lives under My
+                Account → Settings.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">

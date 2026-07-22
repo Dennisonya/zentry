@@ -53,6 +53,10 @@ export function Pricing() {
           <div className="text-6xl sm:text-8xl font-bold text-white/10 tracking-wider">
             Pricing
           </div>
+          <p className="mt-4 text-white/70 max-w-xl mx-auto text-sm sm:text-base">
+            Personal accounts are free. Business plans below are for storefront owners — pick one at
+            signup (no payment yet) when you choose Business.
+          </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">

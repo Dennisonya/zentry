@@ -4,8 +4,20 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Eye, EyeOff } from "lucide-react"
+import { Trash2, Eye, EyeOff, Pencil, AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface Product {
   id: string
@@ -25,6 +37,16 @@ interface ProductListProps {
 export function ProductList({ products, businessId }: ProductListProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Product | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    imageUrl: "",
+  })
 
   const handleDelete = async (productId: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
@@ -57,6 +79,57 @@ export function ProductList({ products, businessId }: ProductListProps) {
     } catch (error) {
       console.error("[v0] Failed to update product:", error)
       alert("Failed to update product")
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const openEdit = (product: Product) => {
+    setEditing(product)
+    setEditError(null)
+    setEditForm({
+      name: product.name,
+      description: product.description || "",
+      price: String(product.price),
+      category: product.category || "",
+      imageUrl: product.image_url || "",
+    })
+    setEditOpen(true)
+  }
+
+  const handleEditSave = async () => {
+    if (!editing) return
+    setEditError(null)
+    setLoading(editing.id)
+    try {
+      const price = Number.parseFloat(editForm.price)
+      if (!Number.isFinite(price) || price < 0) {
+        setEditError("Price must be a valid non-negative number.")
+        return
+      }
+      if (!editForm.name.trim()) {
+        setEditError("Name is required.")
+        return
+      }
+
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("products")
+        .update({
+          name: editForm.name.trim(),
+          description: editForm.description.trim() || null,
+          price,
+          category: editForm.category.trim() || null,
+          image_url: editForm.imageUrl.trim() || null,
+        })
+        .eq("id", editing.id)
+
+      if (error) throw error
+      setEditOpen(false)
+      setEditing(null)
+      router.refresh()
+    } catch (e: any) {
+      setEditError(e?.message || "Failed to update product")
     } finally {
       setLoading(null)
     }
@@ -104,6 +177,15 @@ export function ProductList({ products, businessId }: ProductListProps) {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => openEdit(product)}
+              disabled={loading === product.id}
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => handleToggleAvailability(product.id, product.is_available)}
               disabled={loading === product.id}
             >
@@ -120,6 +202,92 @@ export function ProductList({ products, businessId }: ProductListProps) {
           </div>
         </div>
       ))}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit product</DialogTitle>
+            <DialogDescription>Update details for this product.</DialogDescription>
+          </DialogHeader>
+
+          {editError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{editError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-product-name">Name</Label>
+              <Input
+                id="edit-product-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-product-desc">Description</Label>
+              <Textarea
+                id="edit-product-desc"
+                value={editForm.description}
+                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-product-price">Price</Label>
+                <Input
+                  id="edit-product-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editForm.price}
+                  onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-product-category">Category</Label>
+                <Input
+                  id="edit-product-category"
+                  value={editForm.category}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-product-image">Image URL</Label>
+              <Input
+                id="edit-product-image"
+                type="url"
+                value={editForm.imageUrl}
+                onChange={(e) => setEditForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-transparent"
+              onClick={() => setEditOpen(false)}
+              disabled={!editing || loading === editing?.id}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleEditSave} disabled={!editing || loading === editing?.id}>
+              {editing && loading === editing.id ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

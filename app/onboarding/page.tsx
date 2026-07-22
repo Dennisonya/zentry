@@ -189,6 +189,14 @@ export default function OnboardingPage() {
 
       const validProducts = products.filter((p) => p.name && p.price)
 
+      // Prefill plan from signup preference when available
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("intended_plan")
+        .eq("id", user.id)
+        .maybeSingle()
+      const intendedPlan = (profile as { intended_plan?: string | null } | null)?.intended_plan || null
+
       // Create business with all visual data
       const { data: businessData, error: insertError } = await supabase
         .from("businesses")
@@ -211,11 +219,19 @@ export default function OnboardingPage() {
           hero_image_url: heroUrl,
           dark_mode_enabled: visualData.darkModeEnabled,
           theme_color: visualData.accentColor, // Keep theme_color for backward compatibility
+          subscription_plan: intendedPlan || "basic",
         })
         .select()
         .single()
 
       if (insertError) throw insertError
+
+      // Mark routing preference as business (personal marketplace access remains)
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        default_view: "business",
+        updated_at: new Date().toISOString(),
+      })
 
       if (validProducts.length > 0 && businessData) {
         const productInserts = validProducts.map((p) => ({

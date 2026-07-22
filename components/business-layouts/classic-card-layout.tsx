@@ -30,6 +30,8 @@ export interface Product {
   name: string
   description: string | null
   price: number
+  original_price?: number | null
+  promotion_badge?: string | null
   image_url: string | null
   category: string | null
 }
@@ -39,6 +41,8 @@ export interface Service {
   name: string
   description: string | null
   price: number
+  original_price?: number | null
+  promotion_badge?: string | null
   image_url: string | null
   category: string | null
   duration_minutes: number | null
@@ -49,6 +53,11 @@ export interface ClassicCardLayoutProps {
   business: Business
   products: Product[]
   services: Service[]
+}
+
+function money(n: number) {
+  const x = Number(n)
+  return Number.isFinite(x) ? x.toFixed(2) : "0.00"
 }
 
 export function ClassicCardLayout({ business, products, services }: ClassicCardLayoutProps) {
@@ -173,7 +182,17 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
                       <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+                      <div className="flex items-center gap-2">
+                        {product.promotion_badge ? (
+                          <Badge className="bg-green-600 hover:bg-green-600 text-white">
+                            {product.promotion_badge}
+                          </Badge>
+                        ) : null}
+                        <span className="text-lg font-bold">${money(product.price)}</span>
+                        {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
+                          <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
+                        ) : null}
+                      </div>
                       <Button size="sm" onClick={() => handleOrderClick(product)}>
                         Order
                       </Button>
@@ -219,7 +238,17 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
                       {service.location && <p>{service.location}</p>}
                     </div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-lg font-bold">${service.price.toFixed(2)}</span>
+                      <div className="flex items-center gap-2">
+                        {service.promotion_badge ? (
+                          <Badge className="bg-green-600 hover:bg-green-600 text-white">
+                            {service.promotion_badge}
+                          </Badge>
+                        ) : null}
+                        <span className="text-lg font-bold">${money(service.price)}</span>
+                        {service.original_price != null && Number(service.original_price) > Number(service.price) ? (
+                          <span className="text-sm text-muted-foreground line-through">${money(Number(service.original_price))}</span>
+                        ) : null}
+                      </div>
                     </div>
                     <Button
                       onClick={() => {

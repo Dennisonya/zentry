@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
+  const [bookings, setBookings] = useState<any[]>([])
   const [totalViews, setTotalViews] = useState<number>(0)
 
   useEffect(() => {
@@ -27,9 +28,19 @@ export default function DashboardPage() {
       }
       setUser(user)
 
-      const { data: businessRow } = await supabase.from("businesses").select("*").eq("user_id", user.id).single()
+      const { data: businessRow } = await supabase.from("businesses").select("*").eq("user_id", user.id).maybeSingle()
       if (!businessRow) {
-        router.replace("/onboarding")
+        // Personal accounts land on /account; only force onboarding for business-default users
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("default_view")
+          .eq("id", user.id)
+          .maybeSingle()
+        if ((profile as { default_view?: string } | null)?.default_view === "personal") {
+          router.replace("/account")
+        } else {
+          router.replace("/onboarding")
+        }
         return
       }
       const biz = businessRow as DashboardBusiness
@@ -58,6 +69,13 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false })
       setOrders(orders || [])
 
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("business_id", biz.id)
+        .order("created_at", { ascending: false })
+      setBookings(bookings || [])
+
       // Get analytics
       const { count: totalViews } = await supabase
         .from("page_views")
@@ -83,6 +101,7 @@ export default function DashboardPage() {
       products={products || []}
       services={services || []}
       orders={orders || []}
+      bookings={bookings || []}
       totalViews={totalViews || 0}
     />
   )

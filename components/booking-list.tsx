@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,7 @@ interface Booking {
     duration_minutes: number | null
     location: string | null
   } | null
+  price: number | null
 }
 
 interface BookingListProps {
@@ -53,10 +54,14 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   completed:  { label: "Completed",    variant: "default" },
 }
 
+const TABS = ["all", "pending", "confirmed", "completed", "cancelled"] as const
+type TabType = typeof TABS[number]
+
 export function BookingList({ bookings, businessId, whatsappNumber, onRecordsChange }: BookingListProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabType>("all")
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [newBookingDate, setNewBookingDate] = useState("")
   const [newBookingTime, setNewBookingTime] = useState("")
@@ -89,6 +94,22 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
     }
   }
 
+   // ✅ Counts
+   const counts = useMemo(() => {
+    return {
+      all: bookings.length,
+      pending: bookings.filter((o) => o.status === "pending").length,
+      confirmed: bookings.filter((o) => o.status === "confirmed").length,
+      completed: bookings.filter((o) => o.status === "completed").length,
+      cancelled: bookings.filter((o) => o.status === "cancelled").length,
+    }
+  }, [bookings])
+// ✅ Filtered bookings
+  const filteredBookings = useMemo(() => {
+    if (activeTab === "all") return bookings
+    return bookings.filter((b) => b.status === activeTab)
+  }, [bookings, activeTab])
+  
   const handleReschedule = async () => {
     if (!selectedBooking || !newBookingDate || !newBookingTime) return
     setLoading(selectedBooking.id)
@@ -151,8 +172,32 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
 
   return (
     <>
+     <div className="flex gap-2 mb-4 flex-wrap">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-md text-sm capitalize transition ${
+              activeTab === tab
+                ? "bg-primary text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted/70"
+            }`}
+          >
+            {tab} ({counts[tab]})
+          </button>
+        ))}
+      </div>
+
+      {/* Empty state */}
+      {filteredBookings.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No {activeTab === "all" ? "" : activeTab} orders found.</p>
+        </div>
+      )}
+
+      {/* Bookings list */}
       <div className="space-y-4">
-        {bookings.map((booking) => {
+        {filteredBookings.map((booking) => {
           const statusConfig = STATUS_CONFIG[booking.status] || { label: booking.status, variant: "outline" as const }
           const serviceLine = booking.services?.name ? booking.services.name : booking.service_id ? "Service" : null
           const whenLine =
@@ -200,6 +245,11 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
                 {booking.notes && (
                   <p>
                     <span className="font-medium text-foreground">Notes:</span> {booking.notes}
+                  </p>
+                )}
+                {booking.price && (
+                  <p>
+                    <span className="font-medium text-foreground">Price:</span> ${booking.price.toFixed(2)}
                   </p>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { getSupabaseServerClient } from "@/lib/supabase"
 import { BusinessPage } from "@/components/business-page"
 import { trackPageView } from "@/lib/analytics"
+import { applyPromotionsToCatalog, fetchActivePromotionsForBusiness, fetchPromotionLinks } from "@/lib/promotions"
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -34,10 +35,17 @@ export default async function BusinessPageRoute({ params }: PageProps) {
     .eq("is_available", true)
     .order("created_at", { ascending: false })
 
+  const promoList = await fetchActivePromotionsForBusiness(supabase, business.id)
+  const promoIds = promoList.map((p) => p.id)
+  const { productLinks, serviceLinks } = await fetchPromotionLinks(supabase, promoIds)
+
+  const discountedProducts = applyPromotionsToCatalog((products as any[]) || [], promoList, productLinks, "product")
+  const discountedServices = applyPromotionsToCatalog((services as any[]) || [], promoList, serviceLinks, "service")
+
   // Track page view (server-side)
   await trackPageView(business.id)
 
-  return <BusinessPage business={business} products={products || []} services={services || []} />
+  return <BusinessPage business={business} products={discountedProducts || []} services={discountedServices || []} />
 }
 
 export async function generateMetadata({ params }: PageProps) {

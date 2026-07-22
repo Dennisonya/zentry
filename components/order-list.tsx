@@ -1,146 +1,222 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatDistanceToNow } from "date-fns"
-import { CheckCircle, XCircle, CheckCheck } from "lucide-react"
+import { CheckCircle, XCircle, CheckCheck, ChevronRight } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
-
-interface Order {
-  id: string
-  customer_name: string
-  customer_email: string | null
-  customer_phone: string | null
-  total_amount: number
-  status: string
-  order_items: any
-  created_at: string
-}
+import { OrderDetailModal, type Order } from "@/components/order-detail-modal"
 
 interface OrderListProps {
   orders: Order[]
   businessId?: string
-  onRecordsChange?: () => void
 }
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  pending:   "secondary",
+  pending: "secondary",
   confirmed: "default",
   cancelled: "destructive",
   completed: "default",
 }
 
-export function OrderList({ orders, businessId, onRecordsChange }: OrderListProps) {
+const TABS = ["all", "pending", "confirmed", "completed", "cancelled"] as const
+type TabType = typeof TABS[number]
+
+export function OrderList({ orders: initialOrders, businessId }: OrderListProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState<string | null>(null)
+  const [orders, setOrders] = useState<Order[]>(initialOrders)
+  const [activeTab, setActiveTab] = useState<TabType>("all")
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
-  if (orders.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>No orders yet. Share your page to start receiving orders!</p>
-      </div>
-    )
-  }
-
-  const updateStatus = async (orderId: string, newStatus: string) => {
+  // ✅ Realtime sync
+  useEffect(() => {
     if (!businessId) return
-    setLoading(orderId)
+    const supabase = getSupabaseClient()
+
+    const channel = supabase
+      .channel("orders-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `business_id=eq.${businessId}`,
+        },
+        (payload) => {
+          const updatedOrder = payload.new as Order
+          setOrders((prev) =>
+            prev.map((order) =>
+              order.id === updatedOrder.id ? updatedOrder : order
+            )
+          )
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [businessId])
+
+  // ✅ Counts
+  const counts = useMemo(() => {
+    return {
+      all: orders.length,
+      pending: orders.filter((o) => o.status === "pending").length,
+      confirmed: orders.filter((o) => o.status === "confirmed").length,
+      completed: orders.filter((o) => o.status === "completed").length,
+      cancelled: orders.filter((o) => o.status === "cancelled").length,
+    }
+  }, [orders])
+
+  // ✅ Filtered orders
+  const filteredOrders = useMemo(() => {
+    if (activeTab === "all") return orders
+    return orders.filter((o) => o.status === activeTab)
+  }, [orders, activeTab])
+
+  const updateStatus = async (e: React.MouseEvent, orderId: string, newStatus: string) => {
+    e.stopPropagation()
+    if (!businessId) return
+    setLoadingId(orderId)
+
     try {
-      const supabase = getSupabaseClient() as any
+      const supabase = getSupabaseClient()
       const { error } = await supabase
         .from("orders")
-        .update({ status: newStatus as "pending" | "confirmed" | "cancelled" | "completed" })
+        .update({ status: newStatus } as unknown as never)
         .eq("id", orderId)
+
       if (error) throw error
-      onRecordsChange?.()
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      )
+
       router.refresh()
-    } catch (err) {
-      console.error("Failed to update order:", err)
-      alert("Failed to update order. Please try again.")
+    } catch {
+      alert("Failed to update order.")
     } finally {
-      setLoading(null)
+      setLoadingId(null)
     }
   }
 
+  const handleRowClick = (order: Order) => {
+    setSelectedOrder(order)
+    setModalOpen(true)
+  }
+
+  const handleOrderUpdated = (updated: Order) => {
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)))
+    setSelectedOrder(updated)
+  }
+
   return (
-    <div className="space-y-4">
-      {orders.map((order) => {
-        const statusVariant = STATUS_VARIANTS[order.status] ?? "outline"
-        const canApprove = order.status === "pending"
-        const canCancel = !["cancelled", "completed"].includes(order.status)
-        const canComplete = order.status === "confirmed"
+    <>
+      {/* 🔥 Tabs with counts */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-md text-sm capitalize transition ${
+              activeTab === tab
+                ? "bg-primary text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted/70"
+            }`}
+          >
+            {tab} ({counts[tab]})
+          </button>
+        ))}
+      </div>
 
-        return (
-          <div key={order.id} className="p-4 border rounded-lg space-y-2">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <h3 className="font-semibold">{order.customer_name}</h3>
-                <p className="text-sm text-muted-foreground">{order.customer_phone || order.customer_email}</p>
+      {/* Empty state */}
+      {filteredOrders.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No {activeTab === "all" ? "" : activeTab} orders found.</p>
+        </div>
+      )}
+
+      {/* Orders list */}
+      <div className="space-y-2">
+        {filteredOrders.map((order) => {
+          const statusVariant = STATUS_VARIANTS[order.status] ?? "outline"
+          const canApprove = order.status === "pending"
+          const canCancel = !["cancelled", "completed"].includes(order.status)
+          const canComplete = order.status === "confirmed"
+          const items = Array.isArray(order.order_items) ? order.order_items : []
+
+          return (
+            <div
+              key={order.id}
+              onClick={() => handleRowClick(order)}
+              className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-muted/40 transition"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-semibold text-sm truncate">{order.customer_name}</span>
+                  <Badge
+                    variant={statusVariant}
+                    className={`capitalize text-xs ${
+                      order.status === "completed" ? "bg-green-100 text-green-700" : ""
+                    }`}
+                  >
+                    {order.status}
+                  </Badge>
+                </div>
+
+                <p className="text-xs text-muted-foreground truncate">
+                  {items.map((i) => i.product_name).join(", ") || "No items"}
+                </p>
+
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatDistanceToNow(new Date(order.created_at))} ago
+                </p>
               </div>
-              <Badge variant={statusVariant} className="capitalize">{order.status}</Badge>
-            </div>
 
-            <div className="text-sm text-muted-foreground">
-              {Array.isArray(order.order_items) &&
-                order.order_items.map((item: any, idx: number) => (
-                  <div key={idx}>
-                    {item.product_name} — ${item.price?.toFixed(2)} × {item.quantity || 1}
-                  </div>
-                ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(order.created_at))} ago
-              </span>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">${Number(order.total_amount).toFixed(2)}</span>
+                <span className="font-semibold text-sm">
+                  ${Number(order.total_amount).toFixed(2)}
+                </span>
+
                 {businessId && (
-                  <>
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     {canApprove && (
-                      <Button
-                        size="sm"
-                        disabled={loading === order.id}
-                        onClick={() => updateStatus(order.id, "confirmed")}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                        Approve
+                      <Button size="sm" onClick={(e) => updateStatus(e, order.id, "confirmed")}>
+                        <CheckCircle className="h-3 w-3 mr-1" /> Approve
                       </Button>
                     )}
                     {canComplete && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={loading === order.id}
-                        onClick={() => updateStatus(order.id, "completed")}
-                        className="bg-transparent"
-                      >
-                        <CheckCheck className="h-3.5 w-3.5 mr-1" />
-                        Complete
+                      <Button size="sm" variant="outline" onClick={(e) => updateStatus(e, order.id, "completed")}>
+                        <CheckCheck className="h-3 w-3 mr-1" /> Done
                       </Button>
                     )}
                     {canCancel && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={loading === order.id}
-                        onClick={() => updateStatus(order.id, "cancelled")}
-                        className="bg-transparent text-destructive hover:text-destructive border-destructive/30 hover:border-destructive"
-                      >
-                        <XCircle className="h-3.5 w-3.5 mr-1" />
-                        Cancel
+                      <Button size="sm" variant="outline" onClick={(e) => updateStatus(e, order.id, "cancelled")}>
+                        <XCircle className="h-3 w-3" />
                       </Button>
                     )}
-                  </>
+                  </div>
                 )}
+
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      <OrderDetailModal
+        order={selectedOrder}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onOrderUpdated={handleOrderUpdated}
+      />
+    </>
   )
 }

@@ -51,9 +51,9 @@ interface BusinessPageProps {
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
   return (
     <BusinessPageWithLayout
-      business={business}
-      products={products}
-      services={services}
+      business={business as Business}
+      products={products as Product[]}
+      services={services as Service[]}
       layoutStyle={business.layout_style}
     />
   )

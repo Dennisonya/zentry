@@ -4,8 +4,20 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Eye, EyeOff } from "lucide-react"
+import { Trash2, Eye, EyeOff, Pencil, AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface Service {
   id: string
@@ -27,6 +39,18 @@ interface ServiceListProps {
 export function ServiceList({ services, businessId }: ServiceListProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Service | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "",
+    imageUrl: "",
+    durationMinutes: "",
+    location: "",
+  })
 
   const handleDelete = async (serviceId: string) => {
     if (!confirm("Are you sure you want to delete this service?")) return
@@ -59,6 +83,67 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
     } catch (error) {
       console.error("[v0] Failed to update service:", error)
       alert("Failed to update service")
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const openEdit = (service: Service) => {
+    setEditing(service)
+    setEditError(null)
+    setEditForm({
+      name: service.name,
+      description: service.description || "",
+      price: String(service.price),
+      category: service.category || "",
+      imageUrl: service.image_url || "",
+      durationMinutes: service.duration_minutes != null ? String(service.duration_minutes) : "",
+      location: service.location || "",
+    })
+    setEditOpen(true)
+  }
+
+  const handleEditSave = async () => {
+    if (!editing) return
+    setEditError(null)
+    setLoading(editing.id)
+    try {
+      const price = Number.parseFloat(editForm.price)
+      if (!Number.isFinite(price) || price < 0) {
+        setEditError("Price must be a valid non-negative number.")
+        return
+      }
+      if (!editForm.name.trim()) {
+        setEditError("Name is required.")
+        return
+      }
+      const duration =
+        editForm.durationMinutes.trim() === "" ? null : Number.parseInt(editForm.durationMinutes, 10)
+      if (duration != null && (!Number.isFinite(duration) || duration < 0)) {
+        setEditError("Duration must be a valid non-negative number.")
+        return
+      }
+
+      const supabase = getSupabaseClient()
+      const { error } = await supabase
+        .from("services")
+        .update({
+          name: editForm.name.trim(),
+          description: editForm.description.trim() || null,
+          price,
+          category: editForm.category.trim() || null,
+          image_url: editForm.imageUrl.trim() || null,
+          duration_minutes: duration,
+          location: editForm.location.trim() || null,
+        })
+        .eq("id", editing.id)
+
+      if (error) throw error
+      setEditOpen(false)
+      setEditing(null)
+      router.refresh()
+    } catch (e: any) {
+      setEditError(e?.message || "Failed to update service")
     } finally {
       setLoading(null)
     }
@@ -118,6 +203,15 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => openEdit(service)}
+              disabled={loading === service.id}
+              title="Edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => handleToggleAvailability(service.id, service.is_available)}
               disabled={loading === service.id}
             >
@@ -134,6 +228,114 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
           </div>
         </div>
       ))}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit service</DialogTitle>
+            <DialogDescription>Update details for this service.</DialogDescription>
+          </DialogHeader>
+
+          {editError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{editError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-service-name">Name</Label>
+              <Input
+                id="edit-service-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-service-desc">Description</Label>
+              <Textarea
+                id="edit-service-desc"
+                value={editForm.description}
+                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-price">Price</Label>
+                <Input
+                  id="edit-service-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editForm.price}
+                  onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-category">Category</Label>
+                <Input
+                  id="edit-service-category"
+                  value={editForm.category}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-duration">Duration (minutes)</Label>
+                <Input
+                  id="edit-service-duration"
+                  type="number"
+                  min="0"
+                  value={editForm.durationMinutes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, durationMinutes: e.target.value }))} 
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-service-location">Location</Label>
+                <Input
+                  id="edit-service-location"
+                  value={editForm.location}
+                  onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))} 
+                  disabled={!editing || loading === editing?.id}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-service-image">Image URL</Label>
+              <Input
+                id="edit-service-image"
+                type="url"
+                value={editForm.imageUrl}
+                onChange={(e) => setEditForm((f) => ({ ...f, imageUrl: e.target.value }))} 
+                disabled={!editing || loading === editing?.id}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-transparent"
+              onClick={() => setEditOpen(false)}
+              disabled={!editing || loading === editing?.id}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleEditSave} disabled={!editing || loading === editing?.id}>
+              {editing && loading === editing.id ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

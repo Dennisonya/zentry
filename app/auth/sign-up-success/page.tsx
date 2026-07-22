@@ -21,7 +21,8 @@ export default function SignUpSuccessPage() {
         <CardContent className="space-y-4">
           <div className="bg-muted p-4 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              Click the link in the email to confirm your account and complete your business setup.
+              Click the link in the email to confirm your account. Business accounts continue to
+              storefront setup; personal accounts open your marketplace account.
             </p>
           </div>
 

@@ -10,10 +10,14 @@ export function DashboardSubpageLayout({
   title,
   description,
   children,
+  backHref = "/dashboard",
+  backLabel = "Back to Dashboard",
 }: {
   title: string
   description?: string
   children: ReactNode
+  backHref?: string
+  backLabel?: string
 }) {
   return (
     <div className="min-h-screen bg-background">
@@ -29,10 +33,10 @@ export function DashboardSubpageLayout({
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Link href="/dashboard">
+            <Link href={backHref}>
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                {backLabel}
               </Button>
             </Link>
           </div>

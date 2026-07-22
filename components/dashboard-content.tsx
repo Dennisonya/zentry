@@ -19,6 +19,7 @@ import {
   Calendar,
   Tag,
   Users,
+  UserCircle,
 } from "lucide-react"
 import { AddProductDialog } from "@/components/add-product-dialog"
 import { ProductList } from "@/components/product-list"
@@ -73,15 +74,29 @@ export interface Order {
   created_at: string
 }
 
+export interface Booking {
+  id: string
+  customer_name: string
+  customer_email: string | null
+  customer_phone: string | null
+  total_amount: number
+  status: string
+  booking_date: string
+  booking_time: string
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
 interface DashboardContentProps {
   business: Business
   products: Product[]
   services: Service[]
   orders: Order[]
+  bookings: Booking[]
   totalViews: number
 }
 
-export function DashboardContent({ business, products, services, orders, totalViews }: DashboardContentProps) {
+export function DashboardContent({ business, products, services, orders, totalViews, bookings }: DashboardContentProps) {
   const router = useRouter()
   const [addProductOpen, setAddProductOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -103,13 +118,21 @@ export function DashboardContent({ business, products, services, orders, totalVi
   }
 
   // Revenue from orders (exclude cancelled)
-  const totalRevenue = orders
-    .filter((o) => o.status !== "cancelled")
+  const totalCompletedOrders= orders
+    .filter((o) => o.status === "completed")
     .reduce((sum, order) => sum + Number(order.total_amount), 0)
 
+  const totalBookingsRevenue= bookings
+    .filter((b) => b.status === "completed")
+    .reduce((sum, booking) => sum + Number(booking.total_amount), 0)
+
+  const totalRevenue = Number(totalCompletedOrders) + Number(totalBookingsRevenue)
+  console.log(totalRevenue)
+  console.log(totalCompletedOrders)
+  console.log(totalBookingsRevenue)
   // For service businesses, active bookings = confirmed + pending
-  const activeBookings = orders.filter((o) =>
-    ["pending", "confirmed", "rescheduled", "inquiry"].includes(o.status)
+  const activeBookings = bookings.filter((b) =>
+    ["pending", "confirmed", "rescheduled", "inquiry"].includes(b.status)
   ).length
 
   return (
@@ -126,6 +149,12 @@ export function DashboardContent({ business, products, services, orders, totalVi
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/account">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <UserCircle className="h-4 w-4 mr-2" />
+                My Account
+              </Button>
+            </Link>
             <Link href="/dashboard/analytics">
               <Button variant="outline" size="sm" className="bg-transparent">
                 <TrendingUp className="h-4 w-4 mr-2" />
@@ -195,13 +224,15 @@ export function DashboardContent({ business, products, services, orders, totalVi
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {isServiceBusiness ? "Total Services" : "Total Products"}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Catalog</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{products.length}</div>
+              <div className="text-2xl font-bold">{products.length + services.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {products.length} product{products.length !== 1 ? "s" : ""} · {services.length} service
+                {services.length !== 1 ? "s" : ""}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -241,7 +272,7 @@ export function DashboardContent({ business, products, services, orders, totalVi
           </Card>
         </div>
 
-        {/* Products + services */}
+        {/* Catalog: products and services are separate on the storefront */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -249,11 +280,11 @@ export function DashboardContent({ business, products, services, orders, totalVi
                 <div>
                   <CardTitle>Products</CardTitle>
                   <CardDescription>
-                    Manage your product catalog. Use{" "}
+                    Shown in the Products section on your public page. Product orders appear under{" "}
                     <Link href="/dashboard/orders" className="text-primary underline-offset-4 hover:underline">
                       Orders
-                    </Link>{" "}
-                    for incoming product requests.
+                    </Link>
+                    .
                   </CardDescription>
                 </div>
                 <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
@@ -269,21 +300,16 @@ export function DashboardContent({ business, products, services, orders, totalVi
 
           <Card>
             <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <CardTitle>Services</CardTitle>
-                  <CardDescription>
-                    Manage your service offerings. Use{" "}
-                    <Link href="/dashboard/bookings" className="text-primary underline-offset-4 hover:underline">
-                      Bookings
-                    </Link>{" "}
-                    for incoming service requests.
-                  </CardDescription>
-                </div>
-                <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add
-                </Button>
+              <div className="flex flex-col gap-2">
+                <CardTitle>Services</CardTitle>
+                <CardDescription>
+                  Shown in the Services section on your public page. Service inquiries and bookings appear under{" "}
+                  <Link href="/dashboard/bookings" className="text-primary underline-offset-4 hover:underline">
+                    Bookings
+                  </Link>
+                  . Use <span className="font-medium text-foreground">Add</span> above and choose{" "}
+                  <span className="font-medium text-foreground">Service</span> to create a new service.
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent>

@@ -29,6 +29,8 @@ interface Product {
   name: string
   description: string | null
   price: number
+  original_price?: number | null
+  promotion_badge?: string | null
   image_url: string | null
   category: string | null
 }
@@ -38,6 +40,8 @@ interface Service {
   name: string
   description: string | null
   price: number
+  original_price?: number | null
+  promotion_badge?: string | null
   image_url: string | null
   category: string | null
   duration_minutes: number | null
@@ -48,6 +52,11 @@ interface ModernSplitLayoutProps {
   business: Business
   products: Product[]
   services: Service[]
+}
+
+function money(n: number) {
+  const x = Number(n)
+  return Number.isFinite(x) ? x.toFixed(2) : "0.00"
 }
 
 export function ModernSplitLayout({ business, products, services }: ModernSplitLayoutProps) {
@@ -65,7 +74,7 @@ export function ModernSplitLayout({ business, products, services }: ModernSplitL
     if (!business.whatsapp_number) return
 
     const message = encodeURIComponent(
-      `Hi! I'm interested in ordering:\n\n${product.name}\nPrice: $${product.price.toFixed(2)}\n\nFrom: ${business.business_name}`,
+      `Hi! I'm interested in ordering:\n\n${product.name}\nPrice: $${money(product.price)}\n\nFrom: ${business.business_name}`,
     )
     const whatsappUrl = `https://wa.me/${business.whatsapp_number.replace(/[^0-9]/g, "")}?text=${message}`
     window.open(whatsappUrl, "_blank")
@@ -161,12 +170,24 @@ export function ModernSplitLayout({ business, products, services }: ModernSplitL
                               {product.category}
                             </Badge>
                           )}
+                          {product.promotion_badge ? (
+                            <Badge className="mb-2 ml-2 bg-green-600 hover:bg-green-600 text-white">
+                              {product.promotion_badge}
+                            </Badge>
+                          ) : null}
                           <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
                           {product.description && <p className="text-muted-foreground mb-4">{product.description}</p>}
                           <div className="flex items-center justify-between">
-                            <span className="text-2xl font-bold" style={{ color: accentColor }}>
-                              ${product.price.toFixed(2)}
-                            </span>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-2xl font-bold" style={{ color: accentColor }}>
+                                ${money(product.price)}
+                              </span>
+                              {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
+                                <span className="text-sm text-muted-foreground line-through">
+                                  ${money(Number(product.original_price))}
+                                </span>
+                              ) : null}
+                            </div>
                             {business.whatsapp_number ? (
                               <Button
                                 size="sm"
@@ -213,6 +234,11 @@ export function ModernSplitLayout({ business, products, services }: ModernSplitL
                               {service.category}
                             </Badge>
                           )}
+                          {service.promotion_badge ? (
+                            <Badge className="mb-2 ml-2 bg-green-600 hover:bg-green-600 text-white">
+                              {service.promotion_badge}
+                            </Badge>
+                          ) : null}
                           <h3 className="text-xl font-semibold mb-2">{service.name}</h3>
                           {service.description && <p className="text-muted-foreground mb-4">{service.description}</p>}
                           <div className="text-sm text-muted-foreground mb-4">
@@ -221,9 +247,16 @@ export function ModernSplitLayout({ business, products, services }: ModernSplitL
                             {service.location ? service.location : null}
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-2xl font-bold" style={{ color: accentColor }}>
-                              ${service.price.toFixed(2)}
-                            </span>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-2xl font-bold" style={{ color: accentColor }}>
+                                ${money(service.price)}
+                              </span>
+                              {service.original_price != null && Number(service.original_price) > Number(service.price) ? (
+                                <span className="text-sm text-muted-foreground line-through">
+                                  ${money(Number(service.original_price))}
+                                </span>
+                              ) : null}
+                            </div>
                             <Button
                               size="sm"
                               style={{ backgroundColor: accentColor }}

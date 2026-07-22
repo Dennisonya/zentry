@@ -10,14 +10,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Zap, AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+
+type AccountType = "personal" | "business"
+type Plan = "basic" | "pro" | "premium"
 
 export default function SignUpPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [accountType, setAccountType] = useState<AccountType>("personal")
+  const [intendedPlan, setIntendedPlan] = useState<Plan>("basic")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingUser, setExistingUser] = useState(false)
@@ -40,22 +46,26 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      const redirectUrl = process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/onboarding`
-      console.log('Redirect URL:', redirectUrl)
-      
       const supabase = getSupabaseClient()
+      // /dashboard routes personal accounts to /account; business accounts continue to onboarding if needed
+      const emailRedirectTo =
+        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/onboarding`,
+          emailRedirectTo,
+          data: {
+            account_type: accountType,
+            intended_plan: accountType === "business" ? intendedPlan : null,
+          },
         },
       })
 
-      console.log('Signup response:', { data, error: signUpError })
-
       if (signUpError) {
-        const isExistingUser = signUpError.message?.toLowerCase().includes("user already registered") || signUpError.status === 400
+        const isExistingUser =
+          signUpError.message?.toLowerCase().includes("user already registered") || signUpError.status === 400
         if (isExistingUser) {
           setExistingUser(true)
           setError("Looks like you already have an account with this email.")
@@ -85,7 +95,7 @@ export default function SignUpPage() {
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Start your 14-day free trial. No credit card required.
+            Free to join — shop as a customer, or set up a business storefront.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,6 +116,66 @@ export default function SignUpPage() {
                   )}
                 </AlertDescription>
               </Alert>
+            )}
+
+            <div className="space-y-3">
+              <Label>Account type</Label>
+              <RadioGroup
+                value={accountType}
+                onValueChange={(v) => setAccountType(v as AccountType)}
+                className="grid grid-cols-2 gap-3"
+                disabled={loading}
+              >
+                <label
+                  htmlFor="acct-personal"
+                  className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                >
+                  <RadioGroupItem value="personal" id="acct-personal" className="mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">Personal</div>
+                    <p className="text-xs text-muted-foreground">Browse, order, and book from businesses</p>
+                  </div>
+                </label>
+                <label
+                  htmlFor="acct-business"
+                  className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                >
+                  <RadioGroupItem value="business" id="acct-business" className="mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium">Business</div>
+                    <p className="text-xs text-muted-foreground">Create a storefront and manage orders</p>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
+            {accountType === "business" && (
+              <div className="space-y-3 rounded-lg border p-3">
+                <Label>Preferred plan</Label>
+                <p className="text-xs text-muted-foreground">
+                  No payment collected yet — we&apos;ll remember your choice for when billing launches.
+                </p>
+                <RadioGroup
+                  value={intendedPlan}
+                  onValueChange={(v) => setIntendedPlan(v as Plan)}
+                  className="space-y-2"
+                  disabled={loading}
+                >
+                  {(
+                    [
+                      { value: "basic", label: "Basic", hint: "Getting started" },
+                      { value: "pro", label: "Pro", hint: "Growing businesses" },
+                      { value: "premium", label: "Premium", hint: "Established businesses" },
+                    ] as const
+                  ).map((plan) => (
+                    <label key={plan.value} htmlFor={`plan-${plan.value}`} className="flex items-center gap-2 text-sm">
+                      <RadioGroupItem value={plan.value} id={`plan-${plan.value}`} />
+                      <span className="font-medium">{plan.label}</span>
+                      <span className="text-muted-foreground">— {plan.hint}</span>
+                    </label>
+                  ))}
+                </RadioGroup>
+              </div>
             )}
 
             <div className="space-y-2">
