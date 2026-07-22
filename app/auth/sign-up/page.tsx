@@ -47,9 +47,28 @@ export default function SignUpPage() {
 
     try {
       const supabase = getSupabaseClient()
-      // /dashboard routes personal accounts to /account; business accounts continue to onboarding if needed
+
+      // Pre-check for an existing account before hitting Auth. This calls a
+      // SECURITY DEFINER Postgres function (see scripts/010) rather than
+      // querying profiles directly — RLS only allows reading your own row,
+      // and this function returns just a boolean without exposing any data.
+      const { data: exists, error: checkError } = await supabase.rpc("email_exists", {
+        check_email: email,
+      })
+
+      if (checkError) {
+        console.error("email_exists check failed:", checkError)
+        // Fail open: signUp() is still the source of truth if this errors.
+      } else if (exists) {
+        setExistingUser(true)
+        setError("Looks like you already have an account with this email.")
+        setLoading(false)
+        return
+      }
+      // Land on /auth/callback after the verification link is clicked; that
+      // page waits for the session then sends the user into the marketplace.
       const emailRedirectTo =
-        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`
+        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
