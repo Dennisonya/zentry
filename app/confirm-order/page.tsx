@@ -15,6 +15,7 @@ import { CheckCircle2, Package, Loader2, ShieldCheck, Send, AlertCircle } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+
 interface OrderItem {
   product_name: string
   price: number
@@ -37,8 +38,11 @@ interface ConfirmOrder {
   delivery_address: string | null
   additional_notes: string | null
 }
-
+export const dynamic = 'force-dynamic'
 export default function ConfirmOrderPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
 
