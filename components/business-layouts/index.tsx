@@ -6,6 +6,7 @@ import { CompactOnepageLayout } from "./compact-onepage-layout"
 import { NeonDarkLayout } from "./neon-dark-layout"
 import { SocialCardLayout } from "./social-card-layout"
 import { BusinessCardLayout } from "./business-card-layout"
+import { EditorialStorefrontLayout } from "./editorial-storefront-layout"
 
 import type { LayoutStyle } from "@/lib/layouts"
 
@@ -55,6 +56,7 @@ const layoutComponents = {
   "neon-dark": NeonDarkLayout,
   "social-card": SocialCardLayout,
   "business-card": BusinessCardLayout,
+  "editorial": EditorialStorefrontLayout,
 } as const
 
 interface BusinessPageWithLayoutProps {
@@ -73,4 +75,3 @@ export function BusinessPageWithLayout({
   const LayoutComponent = layoutComponents[layoutStyle] || ClassicCardLayout
   return <LayoutComponent business={business} products={products} services={services} />
 }
-
