@@ -7,6 +7,7 @@ export type LayoutStyle =
   | 'neon-dark'
   | 'social-card'
   | 'business-card'
+  | 'editorial'
 
 export interface LayoutConfig {
   id: LayoutStyle
@@ -72,6 +73,13 @@ export const LAYOUT_CONFIGS: LayoutConfig[] = [
     description: 'Professional, minimalist option for freelancers or service-based workers',
     recommendedFor: ['Services', 'Technology', 'Health & Fitness'],
     previewColor: 'bg-gradient-to-br from-gray-700 to-gray-900'
+  },
+  {
+    id: 'editorial',
+    name: 'Editorial Storefront',
+    description: 'Immersive, image-led storefront with bold typography and premium editorial spacing',
+    recommendedFor: ['Food & Beverage', 'Fashion & Apparel', 'Beauty & Wellness', 'Retail & Shopping', 'Services', 'Arts & Crafts'],
+    previewColor: 'bg-gradient-to-br from-neutral-900 to-stone-500'
   }
 ]
 
@@ -92,4 +100,3 @@ export function getRecommendedLayouts(category: string): LayoutConfig[] {
     config.recommendedFor.includes(category)
   )
 }
-
