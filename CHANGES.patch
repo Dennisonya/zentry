@@ -1,0 +1,1796 @@
+diff --git a/app/dashboard/inventory/page.tsx b/app/dashboard/inventory/page.tsx
+new file mode 100644
+index 0000000..638f71c
+--- /dev/null
++++ b/app/dashboard/inventory/page.tsx
+@@ -0,0 +1,88 @@
++"use client"
++
++import { Suspense, useCallback, useEffect, useState } from "react"
++import { useRouter, useSearchParams } from "next/navigation"
++import type { User } from "@supabase/supabase-js"
++import { getSupabaseClient } from "@/lib/supabase"
++import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
++import { InventoryContent } from "@/components/dashboard/inventory/inventory-content"
++import type { Business, Product } from "@/components/dashboard-content"
++
++function DashboardInventoryPageInner() {
++  const router = useRouter()
++  const searchParams = useSearchParams()
++  const [loading, setLoading] = useState(true)
++  const [user, setUser] = useState<User | null>(null)
++  const [business, setBusiness] = useState<Business | null>(null)
++  const [products, setProducts] = useState<Product[]>([])
++
++  const refetchProducts = useCallback(async (businessId: string) => {
++    const supabase = getSupabaseClient()
++    const { data } = await supabase
++      .from("products")
++      .select("*")
++      .eq("business_id", businessId)
++      .order("created_at", { ascending: false })
++    setProducts((data as Product[]) || [])
++  }, [])
++
++  useEffect(() => {
++    const fetchData = async () => {
++      const supabase = getSupabaseClient()
++      const {
++        data: { user },
++      } = await supabase.auth.getUser()
++      if (!user) {
++        router.replace("/auth/login")
++        return
++      }
++      setUser(user)
++
++      const { data: businessRow } = await supabase
++        .from("businesses")
++        .select("*")
++        .eq("user_id", user.id)
++        .maybeSingle()
++
++      if (!businessRow) {
++        router.replace("/onboarding")
++        return
++      }
++      const biz = businessRow as Business
++      setBusiness(biz)
++      await refetchProducts(biz.id)
++      setLoading(false)
++    }
++    fetchData()
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [])
++
++  if (loading) {
++    return <div className="flex items-center justify-center min-h-screen">Loading inventory...</div>
++  }
++  if (!user || !business) {
++    return null
++  }
++
++  return (
++    <div className="flex min-h-screen bg-muted/30">
++      <DashboardSidebar />
++      <div className="flex-1 min-w-0">
++        <InventoryContent
++          business={business}
++          products={products}
++          onProductsChange={() => refetchProducts(business.id)}
++          autoOpenAdd={searchParams.get("new") === "1"}
++        />
++      </div>
++    </div>
++  )
++}
++
++export default function DashboardInventoryPage() {
++  return (
++    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading inventory...</div>}>
++      <DashboardInventoryPageInner />
++    </Suspense>
++  )
++}
+diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
+index c3458ad..eb89724 100644
+--- a/app/dashboard/page.tsx
++++ b/app/dashboard/page.tsx
+@@ -3,7 +3,8 @@
+ import { useEffect, useState } from "react"
+ import { useRouter } from "next/navigation"
+ import { getSupabaseClient } from "@/lib/supabase"
+-import { DashboardContent } from "@/components/dashboard-content"
++import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
++import { DashboardOverview } from "@/components/dashboard/dashboard-overview"
+ import type { Business as DashboardBusiness } from "@/components/dashboard-content"
+ import type { User } from "@supabase/supabase-js"
+ 
+@@ -16,7 +17,9 @@ export default function DashboardPage() {
+   const [services, setServices] = useState<any[]>([])
+   const [orders, setOrders] = useState<any[]>([])
+   const [bookings, setBookings] = useState<any[]>([])
+-  const [totalViews, setTotalViews] = useState<number>(0)
++  const [pageViews, setPageViews] = useState<any[]>([])
++  const [ownerName, setOwnerName] = useState<string | null>(null)
++  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+ 
+   useEffect(() => {
+     const fetchData = async () => {
+@@ -76,12 +79,21 @@ export default function DashboardPage() {
+         .order("created_at", { ascending: false })
+       setBookings(bookings || [])
+ 
+-      // Get analytics
+-      const { count: totalViews } = await supabase
++      // Get analytics (full rows so the dashboard can compute month-over-month trends)
++      const { data: pageViews } = await supabase
+         .from("page_views")
+-        .select("*", { count: "exact", head: true })
++        .select("id, viewed_at")
+         .eq("business_id", biz.id)
+-      setTotalViews(totalViews || 0)
++      setPageViews(pageViews || [])
++
++      // Owner display info for the greeting/avatar
++      const { data: profile } = await supabase
++        .from("profiles")
++        .select("full_name, avatar_url")
++        .eq("id", user.id)
++        .maybeSingle()
++      setOwnerName((profile as { full_name?: string } | null)?.full_name || null)
++      setAvatarUrl((profile as { avatar_url?: string } | null)?.avatar_url || null)
+ 
+       setLoading(false)
+     }
+@@ -96,13 +108,20 @@ export default function DashboardPage() {
+     return null
+   }
+   return (
+-    <DashboardContent
+-      business={business}
+-      products={products || []}
+-      services={services || []}
+-      orders={orders || []}
+-      bookings={bookings || []}
+-      totalViews={totalViews || 0}
+-    />
++    <div className="flex min-h-screen bg-muted/30">
++      <DashboardSidebar />
++      <div className="flex-1 min-w-0">
++        <DashboardOverview
++          business={business}
++          ownerName={ownerName}
++          avatarUrl={avatarUrl}
++          products={products || []}
++          services={services || []}
++          orders={orders || []}
++          bookings={bookings || []}
++          pageViews={pageViews || []}
++        />
++      </div>
++    </div>
+   )
+ }
+diff --git a/components/business-layouts/classic-card-layout.tsx b/components/business-layouts/classic-card-layout.tsx
+index 4ac7c7e..5c0804a 100644
+--- a/components/business-layouts/classic-card-layout.tsx
++++ b/components/business-layouts/classic-card-layout.tsx
+@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
+ import { Phone, Mail, MapPin, MessageCircle, Instagram, ShoppingCart, Calendar } from "lucide-react"
+ import { EnhancedOrderDialog } from "@/components/enhanced-order-dialog"
+ import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
++import { groupByCategory } from "@/lib/product-categories"
+ 
+ export type Business = {
+   id: string
+@@ -66,6 +67,7 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
+   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
+   const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
+   const accentColor = business.accent_color || business.theme_color
++  const productGroups = groupByCategory(products)
+ 
+   const handleOrderClick = (product: Product) => {
+     setSelectedProduct(product)
+@@ -161,44 +163,53 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
+               <p className="text-muted-foreground mb-6">No products yet — check back soon!</p>
+             </div>
+           ) : (
+-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+-              {products.map((product) => (
+-                <Card
+-                  key={product.id}
+-                  className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+-                >
+-                  {product.image_url && (
+-                    <div className="aspect-square overflow-hidden bg-muted">
+-                      <img
+-                        src={product.image_url}
+-                        alt={product.name}
+-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+-                      />
+-                    </div>
++            <div className="space-y-12">
++              {productGroups.map((group) => (
++                <div key={group.category}>
++                  {productGroups.length > 1 && (
++                    <h3 className="text-xl font-semibold mb-6 pb-2 border-b">{group.category}</h3>
+                   )}
+-                  <CardContent className="p-5">
+-                    <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
+-                    {product.description && (
+-                      <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
+-                    )}
+-                    <div className="flex items-center justify-between">
+-                      <div className="flex items-center gap-2">
+-                        {product.promotion_badge ? (
+-                          <Badge className="bg-green-600 hover:bg-green-600 text-white">
+-                            {product.promotion_badge}
+-                          </Badge>
+-                        ) : null}
+-                        <span className="text-lg font-bold">${money(product.price)}</span>
+-                        {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
+-                          <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
+-                        ) : null}
+-                      </div>
+-                      <Button size="sm" onClick={() => handleOrderClick(product)}>
+-                        Order
+-                      </Button>
+-                    </div>
+-                  </CardContent>
+-                </Card>
++                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
++                    {group.items.map((product) => (
++                      <Card
++                        key={product.id}
++                        className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
++                      >
++                        {product.image_url && (
++                          <div className="aspect-square overflow-hidden bg-muted">
++                            <img
++                              src={product.image_url}
++                              alt={product.name}
++                              className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
++                            />
++                          </div>
++                        )}
++                        <CardContent className="p-5">
++                          <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
++                          {product.description && (
++                            <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
++                          )}
++                          <div className="flex items-center justify-between">
++                            <div className="flex items-center gap-2">
++                              {product.promotion_badge ? (
++                                <Badge className="bg-green-600 hover:bg-green-600 text-white">
++                                  {product.promotion_badge}
++                                </Badge>
++                              ) : null}
++                              <span className="text-lg font-bold">${money(product.price)}</span>
++                              {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
++                                <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
++                              ) : null}
++                            </div>
++                            <Button size="sm" onClick={() => handleOrderClick(product)}>
++                              Order
++                            </Button>
++                          </div>
++                        </CardContent>
++                      </Card>
++                    ))}
++                  </div>
++                </div>
+               ))}
+             </div>
+           )}
+diff --git a/components/dashboard-content.tsx b/components/dashboard-content.tsx
+index c851fde..016888f 100644
+--- a/components/dashboard-content.tsx
++++ b/components/dashboard-content.tsx
+@@ -49,6 +49,9 @@ export interface Product {
+   image_url: string | null
+   category: string | null
+   is_available: boolean
++  stock_quantity: number | null
++  track_inventory: boolean
++  low_stock_threshold: number | null
+ }
+ 
+ export interface Service {
+diff --git a/components/dashboard/dashboard-overview.tsx b/components/dashboard/dashboard-overview.tsx
+new file mode 100644
+index 0000000..4f191ff
+--- /dev/null
++++ b/components/dashboard/dashboard-overview.tsx
+@@ -0,0 +1,441 @@
++"use client"
++
++import { useMemo, useState } from "react"
++import Link from "next/link"
++import {
++  TrendingUp,
++  TrendingDown,
++  ShoppingBag,
++  CalendarDays,
++  Users,
++  DollarSign,
++  Plus,
++  ExternalLink,
++  Share2,
++  AlertTriangle,
++  CheckCircle2,
++} from "lucide-react"
++import { format, isSameDay, parseISO, startOfMonth, subMonths } from "date-fns"
++import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
++import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
++import { Badge } from "@/components/ui/badge"
++import { Button } from "@/components/ui/button"
++import { ThemeToggle } from "@/components/theme-toggle"
++import { ServiceList } from "@/components/service-list"
++import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
++import type { Business, Product, Service, Order, Booking as BaseBooking } from "@/components/dashboard-content"
++
++interface PageView {
++  id: string
++  viewed_at: string
++}
++
++// The bookings table has a service_id column that the shared Booking type
++// (used by the legacy dashboard view) doesn't declare. Extend it locally.
++type Booking = BaseBooking & { service_id?: string | null }
++
++interface DashboardOverviewProps {
++  business: Business
++  ownerName: string | null
++  avatarUrl: string | null
++  products: Product[]
++  services: Service[]
++  orders: Order[]
++  bookings: Booking[]
++  pageViews: PageView[]
++}
++
++const PRODUCT_COLORS = ["bg-blue-500", "bg-orange-500", "bg-lime-500", "bg-slate-400", "bg-cyan-500"]
++
++function monthOverMonth(dates: Date[], now: Date) {
++  const thisMonthStart = startOfMonth(now)
++  const lastMonthStart = startOfMonth(subMonths(now, 1))
++  const thisCount = dates.filter((d) => d >= thisMonthStart).length
++  const lastCount = dates.filter((d) => d >= lastMonthStart && d < thisMonthStart).length
++  if (lastCount === 0) return thisCount > 0 ? 100 : 0
++  return ((thisCount - lastCount) / lastCount) * 100
++}
++
++function sumMonthOverMonth(items: { date: Date; amount: number }[], now: Date) {
++  const thisMonthStart = startOfMonth(now)
++  const lastMonthStart = startOfMonth(subMonths(now, 1))
++  const thisSum = items.filter((i) => i.date >= thisMonthStart).reduce((s, i) => s + i.amount, 0)
++  const lastSum = items
++    .filter((i) => i.date >= lastMonthStart && i.date < thisMonthStart)
++    .reduce((s, i) => s + i.amount, 0)
++  const pct = lastSum === 0 ? (thisSum > 0 ? 100 : 0) : ((thisSum - lastSum) / lastSum) * 100
++  return { thisSum, pct }
++}
++
++function TrendBadge({ pct }: { pct: number }) {
++  const positive = pct >= 0
++  return (
++    <Badge
++      className={
++        positive
++          ? "border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400"
++          : "border-transparent bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-500/15 dark:text-red-400"
++      }
++    >
++      {positive ? "+" : ""}
++      {pct.toFixed(1)}%
++    </Badge>
++  )
++}
++
++export function DashboardOverview({
++  business,
++  ownerName,
++  avatarUrl,
++  products,
++  services,
++  orders,
++  bookings,
++  pageViews,
++}: DashboardOverviewProps) {
++  const [copied, setCopied] = useState(false)
++  const now = useMemo(() => new Date(), [])
++
++  const businessUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${business.slug}`
++
++  const handleCopyLink = async () => {
++    try {
++      await navigator.share?.({ title: business.business_name, url: businessUrl })
++    } catch {
++      await navigator.clipboard.writeText(businessUrl)
++      setCopied(true)
++      setTimeout(() => setCopied(false), 2000)
++    }
++  }
++
++  // ---- Stats ----
++  const validOrders = orders.filter((o) => o.status !== "cancelled")
++  const validBookings = bookings.filter((b) => b.status !== "cancelled")
++
++  const salesItems = [
++    ...validOrders.map((o) => ({ date: parseISO(o.created_at), amount: Number(o.total_amount) })),
++    ...validBookings.map((b) => ({ date: parseISO(b.created_at), amount: Number(b.total_amount) })),
++  ]
++  const { thisSum: totalSales, pct: salesPct } = sumMonthOverMonth(salesItems, now)
++
++  const orderDates = orders.map((o) => parseISO(o.created_at))
++  const ordersPct = monthOverMonth(orderDates, now)
++
++  const bookingDates = bookings.map((b) => parseISO(b.created_at))
++  const bookingsPct = monthOverMonth(bookingDates, now)
++
++  const viewDates = pageViews.map((v) => parseISO(v.viewed_at))
++  const viewsPct = monthOverMonth(viewDates, now)
++
++  // ---- Top products (by units sold from order_items) ----
++  const productSales = validOrders.reduce((acc: Record<string, number>, order) => {
++    const items = Array.isArray(order.order_items) ? order.order_items : []
++    items.forEach((item: any) => {
++      const name = item.product_name || item.name
++      if (name) acc[name] = (acc[name] || 0) + (Number(item.quantity) || 1)
++    })
++    return acc
++  }, {})
++  const topProducts = Object.entries(productSales)
++    .sort((a, b) => b[1] - a[1])
++    .slice(0, 5)
++    .map(([name, sales], i) => ({ name, sales, color: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }))
++
++  // ---- Inventory alerts ----
++  const lowStock = products
++    .filter((p) => p.track_inventory && p.stock_quantity !== null && p.stock_quantity !== undefined)
++    .filter((p) => (p.stock_quantity as number) <= (p.low_stock_threshold ?? 5))
++    .sort((a, b) => (a.stock_quantity as number) - (b.stock_quantity as number))
++    .slice(0, 5)
++
++  // ---- Recent activity ----
++  type Activity = { id: string; label: string; sublabel: string; date: Date }
++  const activities: Activity[] = [
++    ...orders.map((o) => ({
++      id: `order-${o.id}`,
++      label: `New order from ${o.customer_name}`,
++      sublabel: `$${Number(o.total_amount).toFixed(2)} · ${o.status}`,
++      date: parseISO(o.created_at),
++    })),
++    ...bookings.map((b) => ({
++      id: `booking-${b.id}`,
++      label:
++        b.status === "confirmed"
++          ? `Booking confirmed for ${b.customer_name}`
++          : `New booking request from ${b.customer_name}`,
++      sublabel: `${format(parseISO(b.booking_date), "MMM d")} at ${b.booking_time?.slice(0, 5) ?? ""}`,
++      date: parseISO(b.created_at),
++    })),
++  ]
++    .sort((a, b) => b.date.getTime() - a.date.getTime())
++    .slice(0, 5)
++
++  // ---- Today's schedule ----
++  const todaysBookings = bookings
++    .filter((b) => b.status !== "cancelled" && isSameDay(parseISO(b.booking_date), now))
++    .sort((a, b) => (a.booking_time > b.booking_time ? 1 : -1))
++
++  const serviceNameById = new Map(services.map((s) => [s.id, s.name]))
++
++  const firstName = (ownerName || business.business_name).split(" ")[0]
++
++  return (
++    <>
++      <div className="mx-auto max-w-[1600px]">
++        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
++          {/* Header */}
++          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
++            <div className="flex items-center gap-3">
++              <MobileDashboardNav />
++              <div>
++                <h1 className="text-2xl font-bold leading-tight text-balance">Hello {firstName},</h1>
++                <p className="text-muted-foreground">
++                  Here&apos;s what&apos;s happening with {business.business_name}
++                </p>
++              </div>
++            </div>
++            <div className="flex items-center gap-3 self-end sm:self-auto">
++              <span className="hidden text-sm text-muted-foreground md:inline">{format(now, "EEEE, MMMM do yyyy")}</span>
++              <ThemeToggle />
++              <div className="flex items-center gap-2">
++                <Avatar>
++                  <AvatarImage src={avatarUrl ?? undefined} alt={ownerName ?? business.business_name} />
++                  <AvatarFallback>{firstName.slice(0, 2).toUpperCase()}</AvatarFallback>
++                </Avatar>
++                <div className="hidden sm:block">
++                  <p className="text-sm font-semibold leading-none">{ownerName || business.business_name}</p>
++                  <p className="text-xs text-muted-foreground">Business owner</p>
++                </div>
++              </div>
++            </div>
++          </div>
++
++          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
++            <div className="space-y-6">
++              {/* Stat cards */}
++              <div className="grid gap-4 sm:grid-cols-2">
++                <Card className="border-0 bg-emerald-600 text-white shadow-sm">
++                  <CardHeader className="flex flex-row items-center justify-between pb-2">
++                    <CardTitle className="text-sm font-medium text-white/90">Total Sales</CardTitle>
++                    <DollarSign className="h-4 w-4 text-white/80" />
++                  </CardHeader>
++                  <CardContent>
++                    <div className="text-3xl font-bold">
++                      ${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
++                    </div>
++                    <p className="mt-2 flex items-center gap-1 text-xs text-white/85">
++                      {salesPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
++                      <span className="font-semibold">{Math.abs(salesPct).toFixed(1)}%</span> from last month
++                    </p>
++                  </CardContent>
++                </Card>
++
++                <Card>
++                  <CardHeader className="flex flex-row items-center justify-between pb-2">
++                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
++                    <TrendBadge pct={ordersPct} />
++                  </CardHeader>
++                  <CardContent>
++                    <div className="text-3xl font-bold">{orders.length}</div>
++                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
++                      <ShoppingBag className="h-3 w-3" /> from last month
++                    </p>
++                  </CardContent>
++                </Card>
++
++                <Card>
++                  <CardHeader className="flex flex-row items-center justify-between pb-2">
++                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
++                    <TrendBadge pct={bookingsPct} />
++                  </CardHeader>
++                  <CardContent>
++                    <div className="text-3xl font-bold">{bookings.length}</div>
++                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
++                      <CalendarDays className="h-3 w-3" /> from last month
++                    </p>
++                  </CardContent>
++                </Card>
++
++                <Card>
++                  <CardHeader className="flex flex-row items-center justify-between pb-2">
++                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Visitors</CardTitle>
++                    <TrendBadge pct={viewsPct} />
++                  </CardHeader>
++                  <CardContent>
++                    <div className="text-3xl font-bold">{pageViews.length}</div>
++                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
++                      <Users className="h-3 w-3" /> from last month
++                    </p>
++                  </CardContent>
++                </Card>
++              </div>
++
++              {/* Quick actions */}
++              <Card>
++                <CardHeader>
++                  <CardTitle>Quick Actions</CardTitle>
++                </CardHeader>
++                <CardContent>
++                  <div className="grid gap-3 sm:grid-cols-2">
++                    <Button
++                      variant="outline"
++                      className="h-14 justify-start gap-2 bg-transparent text-base font-semibold"
++                      asChild
++                    >
++                      <Link href="/dashboard/inventory?new=1">
++                        <Plus className="h-4 w-4" /> Products
++                      </Link>
++                    </Button>
++                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
++                      <Link href="/dashboard/promotions">
++                        <Plus className="h-4 w-4" /> Promotion
++                      </Link>
++                    </Button>
++                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" asChild>
++                      <Link href={businessUrl} target="_blank">
++                        View Store <ExternalLink className="h-4 w-4" />
++                      </Link>
++                    </Button>
++                    <Button
++                      variant="outline"
++                      className="h-14 justify-between bg-transparent text-base font-semibold"
++                      onClick={handleCopyLink}
++                    >
++                      {copied ? "Link copied!" : "Share Store"} <Share2 className="h-4 w-4" />
++                    </Button>
++                  </div>
++                </CardContent>
++              </Card>
++
++              {/* Recent activity + today's schedule */}
++              <div className="grid gap-6 md:grid-cols-2">
++                <Card>
++                  <CardHeader>
++                    <CardTitle>Recent Activities</CardTitle>
++                  </CardHeader>
++                  <CardContent>
++                    {activities.length === 0 ? (
++                      <p className="text-sm text-muted-foreground">No activity yet — new orders and bookings will show up here.</p>
++                    ) : (
++                      <ul className="space-y-4">
++                        {activities.map((a) => (
++                          <li key={a.id}>
++                            <p className="text-sm font-medium leading-tight">{a.label}</p>
++                            <p className="text-xs text-muted-foreground">{a.sublabel}</p>
++                          </li>
++                        ))}
++                      </ul>
++                    )}
++                  </CardContent>
++                </Card>
++
++                <Card>
++                  <CardHeader>
++                    <CardTitle>Today&apos;s Schedule</CardTitle>
++                  </CardHeader>
++                  <CardContent>
++                    {todaysBookings.length === 0 ? (
++                      <p className="text-sm text-muted-foreground">No bookings scheduled for today.</p>
++                    ) : (
++                      <ul className="space-y-4">
++                        {todaysBookings.map((b) => (
++                          <li key={b.id} className="flex items-center justify-between gap-3">
++                            <div className="flex items-center gap-3">
++                              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
++                                {b.booking_time?.slice(0, 5)}
++                              </div>
++                              <div>
++                                <p className="text-sm font-medium leading-tight">
++                                  {(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}
++                                </p>
++                                <p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p>
++                              </div>
++                            </div>
++                            <Badge variant="secondary" className="shrink-0 capitalize">
++                              {b.status === "pending" ? "Upcoming" : b.status}
++                            </Badge>
++                          </li>
++                        ))}
++                      </ul>
++                    )}
++                  </CardContent>
++                </Card>
++              </div>
++
++              {/* Catalog management — products now live on the dedicated Inventory page */}
++              <div className="space-y-6">
++                <Card>
++                  <CardHeader>
++                    <CardTitle>Services</CardTitle>
++                    <CardDescription>
++                      Shown in the Services section on your public page. Manage product stock and pricing from{" "}
++                      <Link href="/dashboard/inventory" className="text-primary underline-offset-4 hover:underline">
++                        Inventory
++                      </Link>
++                      .
++                    </CardDescription>
++                  </CardHeader>
++                  <CardContent>
++                    <ServiceList services={services} businessId={business.id} />
++                  </CardContent>
++                </Card>
++              </div>
++            </div>
++
++            {/* Right column */}
++            <div className="space-y-6">
++              <Card className="border-0 bg-slate-900 text-white">
++                <CardHeader>
++                  <CardTitle className="text-white">Top Products</CardTitle>
++                </CardHeader>
++                <CardContent>
++                  {topProducts.length === 0 ? (
++                    <p className="text-sm text-white/60">No sales yet — top sellers will show up here.</p>
++                  ) : (
++                    <ul className="space-y-3">
++                      {topProducts.map((p) => (
++                        <li key={p.name} className="flex items-center gap-3">
++                          <span className={`h-3 w-3 shrink-0 rounded-sm ${p.color}`} />
++                          <span className="flex-1 text-sm text-white/90">{p.name}</span>
++                          <span className="text-xs text-white/50">{p.sales} sold</span>
++                        </li>
++                      ))}
++                    </ul>
++                  )}
++                </CardContent>
++              </Card>
++
++              <Card className={lowStock.length > 0 ? "border-0 bg-red-600 text-white" : ""}>
++                <CardHeader>
++                  <CardTitle className={lowStock.length > 0 ? "flex items-center gap-2 text-white" : "flex items-center gap-2"}>
++                    <AlertTriangle className="h-5 w-5" /> Inventory Alerts
++                  </CardTitle>
++                </CardHeader>
++                <CardContent>
++                  {lowStock.length === 0 ? (
++                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
++                      <CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.
++                    </p>
++                  ) : (
++                    <ul className="space-y-2">
++                      {lowStock.map((p) => (
++                        <li key={p.id} className="flex items-start gap-2 text-sm">
++                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
++                          <span>
++                            {p.stock_quantity === 0
++                              ? `Out of stock: ${p.name}!`
++                              : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}
++                          </span>
++                        </li>
++                      ))}
++                    </ul>
++                  )}
++                </CardContent>
++              </Card>
++            </div>
++          </div>
++        </main>
++      </div>
++    </>
++  )
++}
+diff --git a/components/dashboard/dashboard-sidebar.tsx b/components/dashboard/dashboard-sidebar.tsx
+new file mode 100644
+index 0000000..60efce6
+--- /dev/null
++++ b/components/dashboard/dashboard-sidebar.tsx
+@@ -0,0 +1,213 @@
++"use client"
++
++import { useState } from "react"
++import Link from "next/link"
++import { usePathname, useRouter } from "next/navigation"
++import {
++  LayoutGrid,
++  BarChart3,
++  Package,
++  ShoppingBag,
++  Gift,
++  Settings,
++  HelpCircle,
++  LogOut,
++  ChevronDown,
++  Sparkles,
++  Menu,
++} from "lucide-react"
++import { cn } from "@/lib/utils"
++import { getSupabaseClient } from "@/lib/supabase"
++import {
++  DropdownMenu,
++  DropdownMenuContent,
++  DropdownMenuItem,
++  DropdownMenuTrigger,
++} from "@/components/ui/dropdown-menu"
++import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
++import { Button } from "@/components/ui/button"
++
++function NavLink({
++  href,
++  icon: Icon,
++  label,
++  active,
++}: {
++  href: string
++  icon: React.ElementType
++  label: string
++  active: boolean
++}) {
++  return (
++    <Link
++      href={href}
++      className={cn(
++        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
++        active ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white",
++      )}
++    >
++      <Icon className="h-[18px] w-[18px] shrink-0" />
++      <span>{label}</span>
++    </Link>
++  )
++}
++
++function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
++  const pathname = usePathname()
++  const router = useRouter()
++  const [ordersOpen, setOrdersOpen] = useState(false)
++
++  const isOrdersSection = pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bookings")
++
++  const handleSignOut = async () => {
++    const supabase = getSupabaseClient()
++    await supabase.auth.signOut()
++    router.push("/")
++  }
++
++  return (
++    <div className="flex h-full flex-col">
++      {/* Logo */}
++      <div className="flex items-center gap-2 px-2 pb-6">
++        <div className="h-8 w-8 rounded-lg bg-white/15 flex items-center justify-center">
++          <Sparkles className="h-4 w-4 text-white" />
++        </div>
++        <span className="text-xl font-bold text-white tracking-tight">Zentry</span>
++      </div>
++      <div className="h-px bg-white/15 mb-6" />
++
++      <nav className="flex-1 space-y-6 overflow-y-auto">
++        <div>
++          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-white/50">General</p>
++          <div className="space-y-1">
++            <NavLink href="/dashboard" icon={LayoutGrid} label="Dashboard" active={pathname === "/dashboard"} />
++            <NavLink
++              href="/dashboard/analytics"
++              icon={BarChart3}
++              label="Analytics"
++              active={pathname === "/dashboard/analytics"}
++            />
++            <NavLink
++              href={inventoryHref}
++              icon={Package}
++              label="Inventory"
++              active={pathname?.startsWith("/dashboard/inventory") ?? false}
++            />
++
++            {/* Orders / Bookings — expandable */}
++            <div>
++              <button
++                onClick={() => setOrdersOpen((o) => !o)}
++                className={cn(
++                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
++                  isOrdersSection ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white",
++                )}
++              >
++                <ShoppingBag className="h-[18px] w-[18px] shrink-0" />
++                <span className="flex-1 text-left">Orders/Bookings</span>
++                <ChevronDown
++                  className={cn("h-4 w-4 transition-transform", ordersOpen || isOrdersSection ? "rotate-180" : "")}
++                />
++              </button>
++              {(ordersOpen || isOrdersSection) && (
++                <div className="ml-6 mt-1 space-y-1 border-l border-white/15 pl-3">
++                  <Link
++                    href="/dashboard/orders"
++                    className={cn(
++                      "block rounded-lg px-3 py-1.5 text-sm transition-colors",
++                      pathname === "/dashboard/orders"
++                        ? "text-white font-medium"
++                        : "text-white/70 hover:text-white",
++                    )}
++                  >
++                    Orders
++                  </Link>
++                  <Link
++                    href="/dashboard/bookings"
++                    className={cn(
++                      "block rounded-lg px-3 py-1.5 text-sm transition-colors",
++                      pathname === "/dashboard/bookings"
++                        ? "text-white font-medium"
++                        : "text-white/70 hover:text-white",
++                    )}
++                  >
++                    Bookings
++                  </Link>
++                </div>
++              )}
++            </div>
++
++            <NavLink
++              href="/dashboard/promotions"
++              icon={Gift}
++              label="Promotions"
++              active={pathname === "/dashboard/promotions"}
++            />
++          </div>
++        </div>
++
++        <div>
++          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Tools</p>
++          <div className="space-y-1">
++            <NavLink
++              href="/dashboard/settings"
++              icon={Settings}
++              label="Settings"
++              active={pathname === "/dashboard/settings"}
++            />
++            <DropdownMenu>
++              <DropdownMenuTrigger asChild>
++                <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white">
++                  <HelpCircle className="h-[18px] w-[18px] shrink-0" />
++                  <span>Help</span>
++                </button>
++              </DropdownMenuTrigger>
++              <DropdownMenuContent align="start" side="right">
++                <DropdownMenuItem asChild>
++                  <a href="mailto:support@zentry.app">Contact support</a>
++                </DropdownMenuItem>
++                <DropdownMenuItem asChild>
++                  <Link href="/dashboard/settings">Account settings</Link>
++                </DropdownMenuItem>
++              </DropdownMenuContent>
++            </DropdownMenu>
++          </div>
++        </div>
++      </nav>
++
++      <button
++        onClick={handleSignOut}
++        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
++      >
++        <LogOut className="h-[18px] w-[18px] shrink-0" />
++        <span>Logout</span>
++      </button>
++    </div>
++  )
++}
++
++export function DashboardSidebar({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
++  return (
++    <aside className="hidden lg:flex h-screen w-64 shrink-0 flex-col bg-primary px-4 py-6 sticky top-0">
++      <SidebarNavContent inventoryHref={inventoryHref} />
++    </aside>
++  )
++}
++
++export function MobileDashboardNav({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
++  const [open, setOpen] = useState(false)
++  return (
++    <Sheet open={open} onOpenChange={setOpen}>
++      <SheetTrigger asChild>
++        <Button variant="outline" size="icon" className="lg:hidden bg-transparent shrink-0">
++          <Menu className="h-4 w-4" />
++          <span className="sr-only">Open menu</span>
++        </Button>
++      </SheetTrigger>
++      <SheetContent side="left" className="w-64 bg-primary border-none p-4 py-6 [&_button]:text-white">
++        <SheetTitle className="sr-only">Navigation</SheetTitle>
++        <SidebarNavContent inventoryHref={inventoryHref} />
++      </SheetContent>
++    </Sheet>
++  )
++}
+diff --git a/components/dashboard/inventory/category-field.tsx b/components/dashboard/inventory/category-field.tsx
+new file mode 100644
+index 0000000..c9c5ffb
+--- /dev/null
++++ b/components/dashboard/inventory/category-field.tsx
+@@ -0,0 +1,56 @@
++"use client"
++
++import { Input } from "@/components/ui/input"
++import { Label } from "@/components/ui/label"
++
++interface CategoryFieldProps {
++  value: string
++  onChange: (value: string) => void
++  existingCategories: string[]
++  id?: string
++  disabled?: boolean
++  required?: boolean
++}
++
++/**
++ * Free-text category input with autocomplete suggestions drawn from the
++ * business's existing product categories, so owners don't accidentally
++ * fragment the storefront with near-duplicate categories ("Shoes" vs "shoe").
++ * Typing a brand-new value is always allowed — this never restricts you to
++ * a fixed list.
++ */
++export function CategoryField({
++  value,
++  onChange,
++  existingCategories,
++  id = "category",
++  disabled,
++  required,
++}: CategoryFieldProps) {
++  const listId = `${id}-suggestions`
++  return (
++    <div className="space-y-2">
++      <Label htmlFor={id}>
++        Category {required && <span className="text-destructive">*</span>}
++      </Label>
++      <Input
++        id={id}
++        list={listId}
++        placeholder="e.g., Man Shoes"
++        value={value}
++        onChange={(e) => onChange(e.target.value)}
++        disabled={disabled}
++        required={required}
++        autoComplete="off"
++      />
++      <datalist id={listId}>
++        {existingCategories.map((c) => (
++          <option key={c} value={c} />
++        ))}
++      </datalist>
++      <p className="text-xs text-muted-foreground">
++        Products with the same category are grouped together on your storefront.
++      </p>
++    </div>
++  )
++}
+diff --git a/components/dashboard/inventory/inventory-content.tsx b/components/dashboard/inventory/inventory-content.tsx
+new file mode 100644
+index 0000000..b560156
+--- /dev/null
++++ b/components/dashboard/inventory/inventory-content.tsx
+@@ -0,0 +1,418 @@
++"use client"
++
++import { useEffect, useMemo, useState } from "react"
++import { useRouter } from "next/navigation"
++import Link from "next/link"
++import {
++  Plus,
++  Search,
++  MoreHorizontal,
++  Pencil,
++  Trash2,
++  Eye,
++  EyeOff,
++  Minus,
++  AlertTriangle,
++  RotateCcw,
++  ArrowLeft,
++} from "lucide-react"
++import { getSupabaseClient } from "@/lib/supabase"
++import { distinctCategories, getStockStatus, type StockStatus } from "@/lib/product-categories"
++import type { Business, Product } from "@/components/dashboard-content"
++import { Button } from "@/components/ui/button"
++import { Input } from "@/components/ui/input"
++import { Badge } from "@/components/ui/badge"
++import { Card, CardContent } from "@/components/ui/card"
++import {
++  Select,
++  SelectContent,
++  SelectItem,
++  SelectTrigger,
++  SelectValue,
++} from "@/components/ui/select"
++import {
++  DropdownMenu,
++  DropdownMenuContent,
++  DropdownMenuItem,
++  DropdownMenuSeparator,
++  DropdownMenuTrigger,
++} from "@/components/ui/dropdown-menu"
++import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
++import { ProductFormDialog } from "@/components/dashboard/inventory/product-form-dialog"
++
++interface InventoryContentProps {
++  business: Business
++  products: Product[]
++  onProductsChange: () => void
++  autoOpenAdd?: boolean
++}
++
++type StatusFilter = "all" | "active" | "inactive"
++type StockFilter = "all" | "low" | "out" | "not-tracked"
++
++const STOCK_BADGE: Record<StockStatus, { label: string; className: string }> = {
++  "in-stock": { label: "In stock", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400" },
++  low: { label: "Low stock", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" },
++  out: { label: "Out of stock", className: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" },
++  "not-tracked": { label: "Not tracked", className: "bg-muted text-muted-foreground" },
++}
++
++export function InventoryContent({ business, products, onProductsChange, autoOpenAdd }: InventoryContentProps) {
++  const router = useRouter()
++  const [search, setSearch] = useState("")
++  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
++  const [categoryFilter, setCategoryFilter] = useState<string>("all")
++  const [stockFilter, setStockFilter] = useState<StockFilter>("all")
++  const [minPrice, setMinPrice] = useState("")
++  const [maxPrice, setMaxPrice] = useState("")
++
++  const [formOpen, setFormOpen] = useState(false)
++  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
++  const [pendingStockId, setPendingStockId] = useState<string | null>(null)
++  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
++
++  const categories = useMemo(() => distinctCategories(products), [products])
++
++  useEffect(() => {
++    if (autoOpenAdd) {
++      setEditingProduct(null)
++      setFormOpen(true)
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [autoOpenAdd])
++
++  const filtered = useMemo(() => {
++    return products.filter((p) => {
++      if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
++      if (statusFilter === "active" && !p.is_available) return false
++      if (statusFilter === "inactive" && p.is_available) return false
++      if (categoryFilter !== "all" && (p.category || "Other") !== categoryFilter) return false
++
++      const status = getStockStatus(p)
++      if (stockFilter === "low" && status !== "low") return false
++      if (stockFilter === "out" && status !== "out") return false
++      if (stockFilter === "not-tracked" && status !== "not-tracked") return false
++
++      const min = Number.parseFloat(minPrice)
++      const max = Number.parseFloat(maxPrice)
++      if (!Number.isNaN(min) && Number(p.price) < min) return false
++      if (!Number.isNaN(max) && Number(p.price) > max) return false
++
++      return true
++    })
++  }, [products, search, statusFilter, categoryFilter, stockFilter, minPrice, maxPrice])
++
++  const resetFilters = () => {
++    setSearch("")
++    setStatusFilter("all")
++    setCategoryFilter("all")
++    setStockFilter("all")
++    setMinPrice("")
++    setMaxPrice("")
++  }
++
++  const handleOpenAdd = () => {
++    setEditingProduct(null)
++    setFormOpen(true)
++  }
++
++  const handleOpenEdit = (product: Product) => {
++    setEditingProduct(product)
++    setFormOpen(true)
++  }
++
++  const handleToggleAvailability = async (product: Product) => {
++    const supabase = getSupabaseClient() as any
++    await supabase.from("products").update({ is_available: !product.is_available }).eq("id", product.id)
++    onProductsChange()
++  }
++
++  const handleDelete = async (productId: string) => {
++    if (!confirm("Delete this product? This can't be undone.")) return
++    setPendingDeleteId(productId)
++    try {
++      const supabase = getSupabaseClient() as any
++      await supabase.from("products").delete().eq("id", productId)
++      onProductsChange()
++    } finally {
++      setPendingDeleteId(null)
++    }
++  }
++
++  const adjustStock = async (product: Product, delta: number) => {
++    if (!product.track_inventory || product.stock_quantity === null) return
++    const next = Math.max(0, product.stock_quantity + delta)
++    setPendingStockId(product.id)
++    try {
++      const supabase = getSupabaseClient() as any
++      await supabase.from("products").update({ stock_quantity: next }).eq("id", product.id)
++      onProductsChange()
++    } finally {
++      setPendingStockId(null)
++    }
++  }
++
++  return (
++    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
++      {/* Header */}
++      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
++        <div className="flex items-center gap-3">
++          <MobileDashboardNav />
++          <div>
++            <Link
++              href="/dashboard"
++              className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
++            >
++              <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
++            </Link>
++            <h1 className="text-2xl font-bold">Inventory</h1>
++            <p className="text-sm text-muted-foreground">
++              {products.length} product{products.length !== 1 ? "s" : ""} · manage stock, pricing, and categories
++            </p>
++          </div>
++        </div>
++        <Button onClick={handleOpenAdd} className="shrink-0">
++          <Plus className="h-4 w-4 mr-2" /> Add Product
++        </Button>
++      </div>
++
++      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
++        {/* Filters */}
++        <Card className="h-fit lg:sticky lg:top-6">
++          <CardContent className="space-y-5 pt-6">
++            <div className="space-y-2">
++              <Label>Search</Label>
++              <div className="relative">
++                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
++                <Input
++                  placeholder="Search products..."
++                  value={search}
++                  onChange={(e) => setSearch(e.target.value)}
++                  className="pl-8"
++                />
++              </div>
++            </div>
++
++            <div className="space-y-2">
++              <Label>Status</Label>
++              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
++                <SelectTrigger>
++                  <SelectValue />
++                </SelectTrigger>
++                <SelectContent>
++                  <SelectItem value="all">All products</SelectItem>
++                  <SelectItem value="active">Visible on storefront</SelectItem>
++                  <SelectItem value="inactive">Hidden</SelectItem>
++                </SelectContent>
++              </Select>
++            </div>
++
++            <div className="space-y-2">
++              <Label>Category</Label>
++              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
++                <SelectTrigger>
++                  <SelectValue />
++                </SelectTrigger>
++                <SelectContent>
++                  <SelectItem value="all">All categories</SelectItem>
++                  {categories.map((c) => (
++                    <SelectItem key={c} value={c}>
++                      {c}
++                    </SelectItem>
++                  ))}
++                  <SelectItem value="Other">Other (uncategorized)</SelectItem>
++                </SelectContent>
++              </Select>
++            </div>
++
++            <div className="space-y-2">
++              <Label>Stock alert</Label>
++              <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
++                <SelectTrigger>
++                  <SelectValue />
++                </SelectTrigger>
++                <SelectContent>
++                  <SelectItem value="all">All stock</SelectItem>
++                  <SelectItem value="low">Low stock</SelectItem>
++                  <SelectItem value="out">Out of stock</SelectItem>
++                  <SelectItem value="not-tracked">Not tracked</SelectItem>
++                </SelectContent>
++              </Select>
++            </div>
++
++            <div className="space-y-2">
++              <Label>Price range</Label>
++              <div className="flex items-center gap-2">
++                <Input
++                  type="number"
++                  min="0"
++                  placeholder="Min"
++                  value={minPrice}
++                  onChange={(e) => setMinPrice(e.target.value)}
++                />
++                <Input
++                  type="number"
++                  min="0"
++                  placeholder="Max"
++                  value={maxPrice}
++                  onChange={(e) => setMaxPrice(e.target.value)}
++                />
++              </div>
++            </div>
++
++            <Button variant="outline" className="w-full bg-transparent" onClick={resetFilters}>
++              <RotateCcw className="h-4 w-4 mr-2" /> Reset filters
++            </Button>
++          </CardContent>
++        </Card>
++
++        {/* Product list */}
++        <div className="space-y-3">
++          {products.length === 0 ? (
++            <Card>
++              <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
++                <p className="text-muted-foreground">No products yet — add your first one to get started.</p>
++                <Button onClick={handleOpenAdd}>
++                  <Plus className="h-4 w-4 mr-2" /> Add Product
++                </Button>
++              </CardContent>
++            </Card>
++          ) : filtered.length === 0 ? (
++            <Card>
++              <CardContent className="py-16 text-center text-muted-foreground">
++                No products match these filters.
++              </CardContent>
++            </Card>
++          ) : (
++            filtered.map((product) => {
++              const status = getStockStatus(product)
++              const badge = STOCK_BADGE[status]
++              return (
++                <Card key={product.id} className={!product.is_available ? "opacity-60" : ""}>
++                  <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
++                    <div className="flex flex-1 items-center gap-4 min-w-0">
++                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
++                        {product.image_url ? (
++                          <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
++                        ) : null}
++                      </div>
++                      <div className="min-w-0">
++                        <div className="flex items-center gap-2">
++                          <p className="truncate font-semibold">{product.name}</p>
++                          {!product.is_available && (
++                            <Badge variant="secondary" className="shrink-0">
++                              Hidden
++                            </Badge>
++                          )}
++                        </div>
++                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
++                          <span>{product.category || "Other"}</span>
++                          <span>·</span>
++                          <Badge className={`border-transparent ${badge.className}`}>{badge.label}</Badge>
++                          {status !== "not-tracked" && (
++                            <span>
++                              {product.stock_quantity} in stock
++                            </span>
++                          )}
++                        </div>
++                      </div>
++                    </div>
++
++                    <div className="flex items-center justify-between gap-4 sm:justify-end">
++                      {product.track_inventory && product.stock_quantity !== null && (
++                        <div className="flex items-center gap-1 rounded-md border">
++                          <Button
++                            type="button"
++                            variant="ghost"
++                            size="icon"
++                            className="h-8 w-8"
++                            disabled={pendingStockId === product.id || product.stock_quantity <= 0}
++                            onClick={() => adjustStock(product, -1)}
++                          >
++                            <Minus className="h-3.5 w-3.5" />
++                          </Button>
++                          <span className="w-8 text-center text-sm font-medium tabular-nums">
++                            {product.stock_quantity}
++                          </span>
++                          <Button
++                            type="button"
++                            variant="ghost"
++                            size="icon"
++                            className="h-8 w-8"
++                            disabled={pendingStockId === product.id}
++                            onClick={() => adjustStock(product, 1)}
++                          >
++                            <Plus className="h-3.5 w-3.5" />
++                          </Button>
++                        </div>
++                      )}
++
++                      <div className="text-right">
++                        <p className="font-semibold">${Number(product.price).toFixed(2)}</p>
++                      </div>
++
++                      <DropdownMenu>
++                        <DropdownMenuTrigger asChild>
++                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
++                            <MoreHorizontal className="h-4 w-4" />
++                          </Button>
++                        </DropdownMenuTrigger>
++                        <DropdownMenuContent align="end">
++                          <DropdownMenuItem onClick={() => handleOpenEdit(product)}>
++                            <Pencil className="h-4 w-4 mr-2" /> Edit
++                          </DropdownMenuItem>
++                          <DropdownMenuItem onClick={() => handleToggleAvailability(product)}>
++                            {product.is_available ? (
++                              <>
++                                <EyeOff className="h-4 w-4 mr-2" /> Hide from storefront
++                              </>
++                            ) : (
++                              <>
++                                <Eye className="h-4 w-4 mr-2" /> Show on storefront
++                              </>
++                            )}
++                          </DropdownMenuItem>
++                          <DropdownMenuSeparator />
++                          <DropdownMenuItem
++                            className="text-destructive focus:text-destructive"
++                            disabled={pendingDeleteId === product.id}
++                            onClick={() => handleDelete(product.id)}
++                          >
++                            <Trash2 className="h-4 w-4 mr-2" /> Delete
++                          </DropdownMenuItem>
++                        </DropdownMenuContent>
++                      </DropdownMenu>
++                    </div>
++                  </CardContent>
++                  {status === "out" && product.is_available && (
++                    <div className="flex items-center gap-2 border-t bg-red-50 px-4 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-400">
++                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
++                      Out of stock and still visible on your storefront. Hide it from the menu above if you don't
++                      want customers to order it.
++                    </div>
++                  )}
++                </Card>
++              )
++            })
++          )}
++        </div>
++      </div>
++
++      <ProductFormDialog
++        open={formOpen}
++        onOpenChange={setFormOpen}
++        businessId={business.id}
++        existingCategories={categories}
++        product={editingProduct}
++        onSaved={() => {
++          router.refresh()
++          onProductsChange()
++        }}
++      />
++    </div>
++  )
++}
++
++function Label({ children }: { children: React.ReactNode }) {
++  return <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>
++}
+diff --git a/components/dashboard/inventory/product-form-dialog.tsx b/components/dashboard/inventory/product-form-dialog.tsx
+new file mode 100644
+index 0000000..eee65cf
+--- /dev/null
++++ b/components/dashboard/inventory/product-form-dialog.tsx
+@@ -0,0 +1,268 @@
++"use client"
++
++import type React from "react"
++import { useEffect, useState } from "react"
++import { Button } from "@/components/ui/button"
++import { Input } from "@/components/ui/input"
++import { Label } from "@/components/ui/label"
++import { Textarea } from "@/components/ui/textarea"
++import { Switch } from "@/components/ui/switch"
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogFooter,
++  DialogHeader,
++  DialogTitle,
++} from "@/components/ui/dialog"
++import { Alert, AlertDescription } from "@/components/ui/alert"
++import { AlertCircle } from "lucide-react"
++import { getSupabaseClient } from "@/lib/supabase"
++import { CategoryField } from "@/components/dashboard/inventory/category-field"
++import type { Product } from "@/components/dashboard-content"
++
++interface ProductFormDialogProps {
++  open: boolean
++  onOpenChange: (open: boolean) => void
++  businessId: string
++  existingCategories: string[]
++  /** When editing, pass the product to prefill. Omit/null to create a new product. */
++  product?: Product | null
++  onSaved?: () => void
++}
++
++const EMPTY_FORM = {
++  name: "",
++  description: "",
++  price: "",
++  category: "",
++  imageUrl: "",
++  trackInventory: false,
++  stockQuantity: "",
++  lowStockThreshold: "5",
++}
++
++export function ProductFormDialog({
++  open,
++  onOpenChange,
++  businessId,
++  existingCategories,
++  product,
++  onSaved,
++}: ProductFormDialogProps) {
++  const isEditing = !!product
++  const [loading, setLoading] = useState(false)
++  const [error, setError] = useState<string | null>(null)
++  const [form, setForm] = useState(EMPTY_FORM)
++
++  useEffect(() => {
++    if (!open) return
++    if (product) {
++      setForm({
++        name: product.name,
++        description: product.description ?? "",
++        price: String(product.price ?? ""),
++        category: product.category ?? "",
++        imageUrl: product.image_url ?? "",
++        trackInventory: !!product.track_inventory,
++        stockQuantity: product.stock_quantity != null ? String(product.stock_quantity) : "",
++        lowStockThreshold: product.low_stock_threshold != null ? String(product.low_stock_threshold) : "5",
++      })
++    } else {
++      setForm(EMPTY_FORM)
++    }
++    setError(null)
++  }, [open, product])
++
++  const handleSubmit = async (e: React.FormEvent) => {
++    e.preventDefault()
++    setError(null)
++
++    if (form.trackInventory && form.stockQuantity.trim() === "") {
++      setError("Enter a starting stock quantity, or turn off stock tracking.")
++      return
++    }
++
++    setLoading(true)
++    try {
++      const supabase = getSupabaseClient() as any
++
++      const payload = {
++        name: form.name,
++        description: form.description || null,
++        price: Number.parseFloat(form.price),
++        category: form.category.trim() || null,
++        image_url: form.imageUrl || null,
++        track_inventory: form.trackInventory,
++        stock_quantity: form.trackInventory ? Number.parseInt(form.stockQuantity, 10) : null,
++        low_stock_threshold: form.trackInventory
++          ? Number.parseInt(form.lowStockThreshold || "5", 10)
++          : null,
++      }
++
++      if (isEditing && product) {
++        const { error: updateError } = await supabase.from("products").update(payload).eq("id", product.id)
++        if (updateError) throw updateError
++      } else {
++        const { error: insertError } = await supabase.from("products").insert({
++          ...payload,
++          business_id: businessId,
++          is_available: true,
++        })
++        if (insertError) throw insertError
++      }
++
++      onOpenChange(false)
++      onSaved?.()
++    } catch (err: any) {
++      setError(err.message || "Failed to save product")
++    } finally {
++      setLoading(false)
++    }
++  }
++
++  return (
++    <Dialog open={open} onOpenChange={onOpenChange}>
++      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
++        <DialogHeader>
++          <DialogTitle>{isEditing ? "Edit Product" : "Add Product"}</DialogTitle>
++          <DialogDescription>
++            {isEditing ? "Update the details for this product." : "Add a new product to your inventory."}
++          </DialogDescription>
++        </DialogHeader>
++
++        <form onSubmit={handleSubmit} className="space-y-4">
++          {error && (
++            <Alert variant="destructive">
++              <AlertCircle className="h-4 w-4" />
++              <AlertDescription>{error}</AlertDescription>
++            </Alert>
++          )}
++
++          <div className="space-y-2">
++            <Label htmlFor="name">
++              Product name <span className="text-destructive">*</span>
++            </Label>
++            <Input
++              id="name"
++              placeholder="e.g., Adidas Samba"
++              value={form.name}
++              onChange={(e) => setForm({ ...form, name: e.target.value })}
++              required
++              disabled={loading}
++            />
++          </div>
++
++          <div className="space-y-2">
++            <Label htmlFor="description">Description</Label>
++            <Textarea
++              id="description"
++              placeholder="A little about this product..."
++              value={form.description}
++              onChange={(e) => setForm({ ...form, description: e.target.value })}
++              disabled={loading}
++              rows={3}
++            />
++          </div>
++
++          <div className="grid grid-cols-2 gap-4">
++            <div className="space-y-2">
++              <Label htmlFor="price">
++                Price <span className="text-destructive">*</span>
++              </Label>
++              <Input
++                id="price"
++                type="number"
++                step="0.01"
++                min="0"
++                placeholder="49.99"
++                value={form.price}
++                onChange={(e) => setForm({ ...form, price: e.target.value })}
++                required
++                disabled={loading}
++              />
++            </div>
++            <CategoryField
++              value={form.category}
++              onChange={(v) => setForm({ ...form, category: v })}
++              existingCategories={existingCategories}
++              disabled={loading}
++            />
++          </div>
++
++          <div className="space-y-2">
++            <Label htmlFor="imageUrl">Image URL</Label>
++            <Input
++              id="imageUrl"
++              type="url"
++              placeholder="https://example.com/image.jpg"
++              value={form.imageUrl}
++              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
++              disabled={loading}
++            />
++          </div>
++
++          <div className="rounded-lg border p-3 space-y-3">
++            <div className="flex items-center justify-between">
++              <div>
++                <Label htmlFor="trackInventory" className="cursor-pointer">
++                  Track stock for this product
++                </Label>
++                <p className="text-xs text-muted-foreground">
++                  Get low-stock alerts and manage stock from Inventory.
++                </p>
++              </div>
++              <Switch
++                id="trackInventory"
++                checked={form.trackInventory}
++                onCheckedChange={(checked) => setForm({ ...form, trackInventory: checked })}
++                disabled={loading}
++              />
++            </div>
++
++            {form.trackInventory && (
++              <div className="grid grid-cols-2 gap-4 pt-1">
++                <div className="space-y-2">
++                  <Label htmlFor="stockQuantity">
++                    In stock <span className="text-destructive">*</span>
++                  </Label>
++                  <Input
++                    id="stockQuantity"
++                    type="number"
++                    min="0"
++                    placeholder="50"
++                    value={form.stockQuantity}
++                    onChange={(e) => setForm({ ...form, stockQuantity: e.target.value })}
++                    disabled={loading}
++                    required={form.trackInventory}
++                  />
++                </div>
++                <div className="space-y-2">
++                  <Label htmlFor="lowStockThreshold">Low stock at</Label>
++                  <Input
++                    id="lowStockThreshold"
++                    type="number"
++                    min="0"
++                    placeholder="5"
++                    value={form.lowStockThreshold}
++                    onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })}
++                    disabled={loading}
++                  />
++                </div>
++              </div>
++            )}
++          </div>
++
++          <DialogFooter>
++            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="bg-transparent">
++              Cancel
++            </Button>
++            <Button type="submit" disabled={loading}>
++              {loading ? "Saving..." : isEditing ? "Save changes" : "Add product"}
++            </Button>
++          </DialogFooter>
++        </form>
++      </DialogContent>
++    </Dialog>
++  )
++}
+diff --git a/lib/product-categories.ts b/lib/product-categories.ts
+new file mode 100644
+index 0000000..a7e5ffe
+--- /dev/null
++++ b/lib/product-categories.ts
+@@ -0,0 +1,65 @@
++export const UNCATEGORIZED_LABEL = "Other"
++
++export interface CategorizedItem {
++  category: string | null
++}
++
++export interface ProductCategoryGroup<T> {
++  category: string
++  items: T[]
++}
++
++/**
++ * Groups a list of products (or services) by their `category` field.
++ * Items with no category (null/empty/whitespace) are bucketed under
++ * UNCATEGORIZED_LABEL, which always sorts last. Named categories sort
++ * alphabetically. Used by both the Inventory page and the storefront
++ * layouts so grouping stays consistent everywhere.
++ */
++export function groupByCategory<T extends CategorizedItem>(items: T[]): ProductCategoryGroup<T>[] {
++  const groups = new Map<string, T[]>()
++
++  for (const item of items) {
++    const raw = item.category?.trim()
++    const key = raw && raw.length > 0 ? raw : UNCATEGORIZED_LABEL
++    const existing = groups.get(key)
++    if (existing) {
++      existing.push(item)
++    } else {
++      groups.set(key, [item])
++    }
++  }
++
++  return Array.from(groups.entries())
++    .sort(([a], [b]) => {
++      if (a === UNCATEGORIZED_LABEL) return 1
++      if (b === UNCATEGORIZED_LABEL) return -1
++      return a.localeCompare(b)
++    })
++    .map(([category, items]) => ({ category, items }))
++}
++
++/** Distinct, sorted list of categories currently in use — for autocomplete. */
++export function distinctCategories<T extends CategorizedItem>(items: T[]): string[] {
++  const set = new Set<string>()
++  for (const item of items) {
++    const raw = item.category?.trim()
++    if (raw) set.add(raw)
++  }
++  return Array.from(set).sort((a, b) => a.localeCompare(b))
++}
++
++export type StockStatus = "not-tracked" | "in-stock" | "low" | "out"
++
++export function getStockStatus(product: {
++  track_inventory: boolean
++  stock_quantity: number | null
++  low_stock_threshold: number | null
++}): StockStatus {
++  if (!product.track_inventory || product.stock_quantity === null || product.stock_quantity === undefined) {
++    return "not-tracked"
++  }
++  if (product.stock_quantity <= 0) return "out"
++  if (product.stock_quantity <= (product.low_stock_threshold ?? 5)) return "low"
++  return "in-stock"
++}

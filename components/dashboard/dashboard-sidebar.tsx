@@ -87,7 +87,12 @@ function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
               label="Analytics"
               active={pathname === "/dashboard/analytics"}
             />
-            <NavLink href={inventoryHref} icon={Package} label="Inventory" active={false} />
+            <NavLink
+              href={inventoryHref}
+              icon={Package}
+              label="Inventory"
+              active={pathname?.startsWith("/dashboard/inventory") ?? false}
+            />
 
             {/* Orders / Bookings — expandable */}
             <div>
@@ -181,7 +186,7 @@ function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
   )
 }
 
-export function DashboardSidebar({ inventoryHref = "/dashboard#inventory" }: { inventoryHref?: string }) {
+export function DashboardSidebar({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
   return (
     <aside className="hidden lg:flex h-screen w-64 shrink-0 flex-col bg-primary px-4 py-6 sticky top-0">
       <SidebarNavContent inventoryHref={inventoryHref} />
@@ -189,7 +194,7 @@ export function DashboardSidebar({ inventoryHref = "/dashboard#inventory" }: { i
   )
 }
 
-export function MobileDashboardNav({ inventoryHref = "/dashboard#inventory" }: { inventoryHref?: string }) {
+export function MobileDashboardNav({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <Sheet open={open} onOpenChange={setOpen}>

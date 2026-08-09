@@ -14,7 +14,6 @@ import {
   Share2,
   AlertTriangle,
   CheckCircle2,
-  Package,
 } from "lucide-react"
 import { format, isSameDay, parseISO, startOfMonth, subMonths } from "date-fns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,8 +21,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { AddProductDialog } from "@/components/add-product-dialog"
-import { ProductList } from "@/components/product-list"
 import { ServiceList } from "@/components/service-list"
 import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
 import type { Business, Product, Service, Order, Booking as BaseBooking } from "@/components/dashboard-content"
@@ -96,7 +93,6 @@ export function DashboardOverview({
   bookings,
   pageViews,
 }: DashboardOverviewProps) {
-  const [addProductOpen, setAddProductOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const now = useMemo(() => new Date(), [])
 
@@ -147,10 +143,10 @@ export function DashboardOverview({
 
   // ---- Inventory alerts ----
   const lowStock = products
-    .filter((p: any) => p.track_inventory && p.stock_quantity !== null && p.stock_quantity !== undefined)
-    .filter((p: any) => p.stock_quantity <= (p.low_stock_threshold ?? 5))
-    .sort((a: any, b: any) => a.stock_quantity - b.stock_quantity)
-    .slice(0, 5) as any[]
+    .filter((p) => p.track_inventory && p.stock_quantity !== null && p.stock_quantity !== undefined)
+    .filter((p) => (p.stock_quantity as number) <= (p.low_stock_threshold ?? 5))
+    .sort((a, b) => (a.stock_quantity as number) - (b.stock_quantity as number))
+    .slice(0, 5)
 
   // ---- Recent activity ----
   type Activity = { id: string; label: string; sublabel: string; date: Date }
@@ -284,9 +280,11 @@ export function DashboardOverview({
                     <Button
                       variant="outline"
                       className="h-14 justify-start gap-2 bg-transparent text-base font-semibold"
-                      onClick={() => setAddProductOpen(true)}
+                      asChild
                     >
-                      <Plus className="h-4 w-4" /> Products
+                      <Link href="/dashboard/inventory?new=1">
+                        <Plus className="h-4 w-4" /> Products
+                      </Link>
                     </Button>
                     <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
                       <Link href="/dashboard/promotions">
@@ -364,34 +362,17 @@ export function DashboardOverview({
                 </Card>
               </div>
 
-              {/* Catalog management */}
-              <div id="inventory" className="scroll-mt-8 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-4 w-4" /> Products
-                        </CardTitle>
-                        <CardDescription>Shown in the Products section on your public page.</CardDescription>
-                      </div>
-                      <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
-                        <Plus className="h-4 w-4 mr-2" /> Add
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductList products={products} businessId={business.id} />
-                  </CardContent>
-                </Card>
-
+              {/* Catalog management — products now live on the dedicated Inventory page */}
+              <div className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Services</CardTitle>
                     <CardDescription>
-                      Shown in the Services section on your public page. Use{" "}
-                      <span className="font-medium text-foreground">Add</span> above and choose{" "}
-                      <span className="font-medium text-foreground">Service</span>.
+                      Shown in the Services section on your public page. Manage product stock and pricing from{" "}
+                      <Link href="/dashboard/inventory" className="text-primary underline-offset-4 hover:underline">
+                        Inventory
+                      </Link>
+                      .
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -437,7 +418,7 @@ export function DashboardOverview({
                     </p>
                   ) : (
                     <ul className="space-y-2">
-                      {lowStock.map((p: any) => (
+                      {lowStock.map((p) => (
                         <li key={p.id} className="flex items-start gap-2 text-sm">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                           <span>
@@ -455,8 +436,6 @@ export function DashboardOverview({
           </div>
         </main>
       </div>
-
-      <AddProductDialog open={addProductOpen} onOpenChange={setAddProductOpen} businessId={business.id} />
     </>
   )
 }

@@ -49,6 +49,9 @@ export interface Product {
   image_url: string | null
   category: string | null
   is_available: boolean
+  stock_quantity: number | null
+  track_inventory: boolean
+  low_stock_threshold: number | null
 }
 
 export interface Service {

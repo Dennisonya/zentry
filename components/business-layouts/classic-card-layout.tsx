@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Phone, Mail, MapPin, MessageCircle, Instagram, ShoppingCart, Calendar } from "lucide-react"
 import { EnhancedOrderDialog } from "@/components/enhanced-order-dialog"
 import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
+import { groupByCategory } from "@/lib/product-categories"
 
 export type Business = {
   id: string
@@ -66,6 +67,7 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
   const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
   const accentColor = business.accent_color || business.theme_color
+  const productGroups = groupByCategory(products)
 
   const handleOrderClick = (product: Product) => {
     setSelectedProduct(product)
@@ -161,44 +163,53 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
               <p className="text-muted-foreground mb-6">No products yet — check back soon!</p>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {products.map((product) => (
-                <Card
-                  key={product.id}
-                  className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
-                >
-                  {product.image_url && (
-                    <div className="aspect-square overflow-hidden bg-muted">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    </div>
+            <div className="space-y-12">
+              {productGroups.map((group) => (
+                <div key={group.category}>
+                  {productGroups.length > 1 && (
+                    <h3 className="text-xl font-semibold mb-6 pb-2 border-b">{group.category}</h3>
                   )}
-                  <CardContent className="p-5">
-                    <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                    {product.description && (
-                      <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {product.promotion_badge ? (
-                          <Badge className="bg-green-600 hover:bg-green-600 text-white">
-                            {product.promotion_badge}
-                          </Badge>
-                        ) : null}
-                        <span className="text-lg font-bold">${money(product.price)}</span>
-                        {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
-                          <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
-                        ) : null}
-                      </div>
-                      <Button size="sm" onClick={() => handleOrderClick(product)}>
-                        Order
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    {group.items.map((product) => (
+                      <Card
+                        key={product.id}
+                        className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+                      >
+                        {product.image_url && (
+                          <div className="aspect-square overflow-hidden bg-muted">
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            />
+                          </div>
+                        )}
+                        <CardContent className="p-5">
+                          <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
+                          {product.description && (
+                            <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {product.promotion_badge ? (
+                                <Badge className="bg-green-600 hover:bg-green-600 text-white">
+                                  {product.promotion_badge}
+                                </Badge>
+                              ) : null}
+                              <span className="text-lg font-bold">${money(product.price)}</span>
+                              {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
+                                <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
+                              ) : null}
+                            </div>
+                            <Button size="sm" onClick={() => handleOrderClick(product)}>
+                              Order
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
