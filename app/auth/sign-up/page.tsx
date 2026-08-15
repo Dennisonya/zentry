@@ -13,9 +13,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Zap, AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { PLAN_ORDER, PLANS, type PlanId } from "@/lib/plans"
 
 type AccountType = "personal" | "business"
-type Plan = "basic" | "pro" | "premium"
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -23,7 +23,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [accountType, setAccountType] = useState<AccountType>("personal")
-  const [intendedPlan, setIntendedPlan] = useState<Plan>("basic")
+  const [intendedPlan, setIntendedPlan] = useState<PlanId>("basic")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingUser, setExistingUser] = useState(false)
@@ -176,21 +176,15 @@ export default function SignUpPage() {
                 </p>
                 <RadioGroup
                   value={intendedPlan}
-                  onValueChange={(v) => setIntendedPlan(v as Plan)}
+                  onValueChange={(v) => setIntendedPlan(v as PlanId)}
                   className="space-y-2"
                   disabled={loading}
                 >
-                  {(
-                    [
-                      { value: "basic", label: "Basic", hint: "Getting started" },
-                      { value: "pro", label: "Pro", hint: "Growing businesses" },
-                      { value: "premium", label: "Premium", hint: "Established businesses" },
-                    ] as const
-                  ).map((plan) => (
-                    <label key={plan.value} htmlFor={`plan-${plan.value}`} className="flex items-center gap-2 text-sm">
-                      <RadioGroupItem value={plan.value} id={`plan-${plan.value}`} />
-                      <span className="font-medium">{plan.label}</span>
-                      <span className="text-muted-foreground">— {plan.hint}</span>
+                  {PLAN_ORDER.map((id) => (
+                    <label key={id} htmlFor={`plan-${id}`} className="flex items-center gap-2 text-sm">
+                      <RadioGroupItem value={id} id={`plan-${id}`} />
+                      <span className="font-medium">{PLANS[id].name}</span>
+                      <span className="text-muted-foreground">— {PLANS[id].description}</span>
                     </label>
                   ))}
                 </RadioGroup>

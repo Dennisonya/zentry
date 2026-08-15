@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, ArrowLeft, TrendingUp, Eye, ShoppingBag, DollarSign } from "lucide-react"
+import { ArrowLeft, TrendingUp, Eye, ShoppingBag, DollarSign } from "lucide-react"
 import { format, startOfDay, parseISO, startOfWeek, startOfMonth, subDays, subWeeks, subMonths } from "date-fns"
-import { Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Bar, BarChart } from "recharts"
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, Bar, BarChart } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
 
 interface Business {
   id: string
@@ -127,33 +128,34 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
     .sort((a, b) => b.sales - a.sales)
     .slice(0, 5)
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Zentry
-            </span>
-          </div>
-          <Link href="/dashboard">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </header>
+  const chartClassName = "aspect-auto h-[260px] w-full min-w-0 sm:h-[300px]"
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Analytics</h1>
-          <p className="text-muted-foreground">Track your business performance and customer behaviour</p>
+  useEffect(() => {
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const el = document.getElementById(hash)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [])
+
+  return (
+    <div className="mx-auto max-w-[1600px] min-w-0 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="mb-6 flex min-w-0 items-start gap-3">
+        <MobileDashboardNav />
+        <div className="min-w-0">
+          <Link
+            href="/dashboard"
+            className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+          </Link>
+          <h1 className="text-xl font-bold sm:text-2xl">Analytics</h1>
+          <p className="text-sm text-muted-foreground">Track your business performance and customer behaviour</p>
         </div>
+      </div>
+
+      <div className="min-w-0">
 
         {/* Key Metrics */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -207,26 +209,24 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
         {/* Charts */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           {/* Page views chart */}
-          <Card>
+          <Card id="visitors">
             <CardHeader>
               <CardTitle>Page Views (Last 30 Days)</CardTitle>
               <CardDescription>Daily visitor traffic to your business page</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-hidden">
               {viewsChartData.length > 0 ? (
-                <ChartContainer config={{ views: { label: "Views", color: "hsl(var(--chart-1))" } }} className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={viewsChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line type="monotone" dataKey="views" stroke="var(--color-views)" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={{ views: { label: "Views", color: "hsl(var(--chart-1))" } }} className={chartClassName}>
+                  <LineChart data={viewsChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" fontSize={12} tickMargin={8} />
+                    <YAxis fontSize={12} width={32} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="views" stroke="var(--color-views)" strokeWidth={2} />
+                  </LineChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="flex h-[260px] items-center justify-center text-muted-foreground sm:h-[300px]">
                   No page views data yet
                 </div>
               )}
@@ -234,21 +234,21 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
           </Card>
 
           {/* Revenue chart with period toggle */}
-          <Card>
+          <Card id="revenue">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <CardTitle>Revenue</CardTitle>
                   <CardDescription>Income over time (confirmed orders)</CardDescription>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex shrink-0 flex-wrap gap-1">
                   {(["daily", "weekly", "monthly"] as RevenuePeriod[]).map((p) => (
                     <Button
                       key={p}
                       size="sm"
                       variant={revenuePeriod === p ? "default" : "outline"}
                       onClick={() => setRevenuePeriod(p)}
-                      className={revenuePeriod !== p ? "bg-transparent" : ""}
+                      className={`px-2 text-xs sm:px-3 sm:text-sm ${revenuePeriod !== p ? "bg-transparent" : ""}`}
                     >
                       {p.charAt(0).toUpperCase() + p.slice(1)}
                     </Button>
@@ -256,21 +256,19 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-hidden">
               {revenueChartData.some((d) => d.revenue > 0) ? (
-                <ChartContainer config={{ revenue: { label: "Revenue ($)", color: "hsl(var(--chart-2))" } }} className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" fontSize={11} />
-                      <YAxis fontSize={11} tickFormatter={(v) => `$${v}`} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={{ revenue: { label: "Revenue ($)", color: "hsl(var(--chart-2))" } }} className={chartClassName}>
+                  <BarChart data={revenueChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" fontSize={11} tickMargin={8} />
+                    <YAxis fontSize={11} width={40} tickFormatter={(v) => `$${v}`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                <div className="flex h-[260px] items-center justify-center text-muted-foreground sm:h-[300px]">
                   No revenue data yet
                 </div>
               )}
@@ -284,21 +282,19 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
             <CardTitle>Popular Products / Services</CardTitle>
             <CardDescription>Top 5 most ordered items</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-hidden">
             {popularProductsData.length > 0 ? (
-              <ChartContainer config={{ sales: { label: "Orders", color: "hsl(var(--chart-3))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={popularProductsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="sales" fill="var(--color-sales)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <ChartContainer config={{ sales: { label: "Orders", color: "hsl(var(--chart-3))" } }} className={chartClassName}>
+                <BarChart data={popularProductsData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" fontSize={12} tickMargin={8} interval={0} angle={-25} textAnchor="end" height={60} />
+                  <YAxis fontSize={12} width={32} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="sales" fill="var(--color-sales)" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ChartContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="flex h-[260px] items-center justify-center text-muted-foreground sm:h-[300px]">
                 No order data yet
               </div>
             )}

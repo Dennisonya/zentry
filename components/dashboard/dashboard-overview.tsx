@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react"
+import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
 import { format, isSameDay, parseISO, startOfMonth, subMonths } from "date-fns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -80,6 +82,29 @@ function TrendBadge({ pct }: { pct: number }) {
       {positive ? "+" : ""}
       {pct.toFixed(1)}%
     </Badge>
+  )
+}
+
+function StatCardLink({
+  href,
+  className,
+  children,
+}: {
+  href: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <Link href={href} className="block min-w-0 w-full">
+      <Card
+        className={cn(
+          "h-full w-full max-w-full min-w-0 overflow-hidden transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          className,
+        )}
+      >
+        {children}
+      </Card>
+    </Link>
   )
 }
 
@@ -180,25 +205,18 @@ export function DashboardOverview({
   const firstName = (ownerName || business.business_name).split(" ")[0]
 
   return (
-    <>
-      <div className="mx-auto max-w-[1600px]">
-        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="mx-auto w-full min-w-0 max-w-[1600px] overflow-x-hidden">
+      <main className="min-w-0 px-5 py-6 sm:px-6 lg:px-8 lg:py-8">
           {/* Header */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-3">
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
               <MobileDashboardNav />
-              <div>
-                <h1 className="text-2xl font-bold leading-tight text-balance">Hello {firstName},</h1>
-                <p className="text-muted-foreground">
-                  Here&apos;s what&apos;s happening with {business.business_name}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 self-end sm:self-auto">
-              <span className="hidden text-sm text-muted-foreground md:inline">{format(now, "EEEE, MMMM do yyyy")}</span>
-              <ThemeToggle />
-              <div className="flex items-center gap-2">
-                <Avatar>
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                <span className="hidden text-sm text-muted-foreground md:inline">
+                  {format(now, "EEEE, MMMM do yyyy")}
+                </span>
+                <ThemeToggle />
+                <Avatar className="h-9 w-9">
                   <AvatarImage src={avatarUrl ?? undefined} alt={ownerName ?? business.business_name} />
                   <AvatarFallback>{firstName.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
@@ -208,70 +226,77 @@ export function DashboardOverview({
                 </div>
               </div>
             </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold leading-tight sm:text-2xl">Hello {firstName},</h1>
+              <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+                Here&apos;s what&apos;s happening with{" "}
+                <span className="break-words">{business.business_name}</span>
+              </p>
+            </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-            <div className="space-y-6">
+          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0 space-y-6">
               {/* Stat cards */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Card className="border-0 bg-emerald-600 text-white shadow-sm">
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                <StatCardLink href="/dashboard/analytics#revenue" className="border-0 bg-emerald-600 text-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-white/90">Total Sales</CardTitle>
-                    <DollarSign className="h-4 w-4 text-white/80" />
+                    <DollarSign className="h-4 w-4 shrink-0 text-white/80" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">
+                    <div className="text-2xl font-bold sm:text-3xl">
                       ${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                     <p className="mt-2 flex items-center gap-1 text-xs text-white/85">
-                      {salesPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {salesPct >= 0 ? <TrendingUp className="h-3 w-3 shrink-0" /> : <TrendingDown className="h-3 w-3 shrink-0" />}
                       <span className="font-semibold">{Math.abs(salesPct).toFixed(1)}%</span> from last month
                     </p>
                   </CardContent>
-                </Card>
+                </StatCardLink>
 
-                <Card>
+                <StatCardLink href="/dashboard/orders">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
                     <TrendBadge pct={ordersPct} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{orders.length}</div>
+                    <div className="text-2xl font-bold sm:text-3xl">{orders.length}</div>
                     <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <ShoppingBag className="h-3 w-3" /> from last month
+                      <ShoppingBag className="h-3 w-3 shrink-0" /> from last month
                     </p>
                   </CardContent>
-                </Card>
+                </StatCardLink>
 
-                <Card>
+                <StatCardLink href="/dashboard/bookings">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
                     <TrendBadge pct={bookingsPct} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{bookings.length}</div>
+                    <div className="text-2xl font-bold sm:text-3xl">{bookings.length}</div>
                     <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <CalendarDays className="h-3 w-3" /> from last month
+                      <CalendarDays className="h-3 w-3 shrink-0" /> from last month
                     </p>
                   </CardContent>
-                </Card>
+                </StatCardLink>
 
-                <Card>
+                <StatCardLink href="/dashboard/analytics#visitors">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Visitors</CardTitle>
                     <TrendBadge pct={viewsPct} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{pageViews.length}</div>
+                    <div className="text-2xl font-bold sm:text-3xl">{pageViews.length}</div>
                     <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" /> from last month
+                      <Users className="h-3 w-3 shrink-0" /> from last month
                     </p>
                   </CardContent>
-                </Card>
+                </StatCardLink>
               </div>
 
               {/* Quick actions */}
-              <Card>
+              <Card className="min-w-0 w-full max-w-full overflow-hidden">
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
@@ -308,8 +333,8 @@ export function DashboardOverview({
               </Card>
 
               {/* Recent activity + today's schedule */}
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
+              <div className="grid min-w-0 gap-6 md:grid-cols-2">
+                <Card className="min-w-0 w-full max-w-full overflow-hidden">
                   <CardHeader>
                     <CardTitle>Recent Activities</CardTitle>
                   </CardHeader>
@@ -329,7 +354,7 @@ export function DashboardOverview({
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="min-w-0 w-full max-w-full overflow-hidden">
                   <CardHeader>
                     <CardTitle>Today&apos;s Schedule</CardTitle>
                   </CardHeader>
@@ -339,19 +364,19 @@ export function DashboardOverview({
                     ) : (
                       <ul className="space-y-4">
                         {todaysBookings.map((b) => (
-                          <li key={b.id} className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
+                          <li key={b.id} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
                               <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
                                 {b.booking_time?.slice(0, 5)}
                               </div>
-                              <div>
-                                <p className="text-sm font-medium leading-tight">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium leading-tight">
                                   {(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}
                                 </p>
-                                <p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p>
+                                <p className="truncate text-xs text-muted-foreground">Customer: {b.customer_name}</p>
                               </div>
                             </div>
-                            <Badge variant="secondary" className="shrink-0 capitalize">
+                            <Badge variant="secondary" className="w-fit shrink-0 capitalize">
                               {b.status === "pending" ? "Upcoming" : b.status}
                             </Badge>
                           </li>
@@ -363,8 +388,8 @@ export function DashboardOverview({
               </div>
 
               {/* Catalog management — products now live on the dedicated Inventory page */}
-              <div className="space-y-6">
-                <Card>
+              <div className="min-w-0 space-y-6">
+                <Card className="min-w-0 w-full max-w-full overflow-hidden">
                   <CardHeader>
                     <CardTitle>Services</CardTitle>
                     <CardDescription>
@@ -383,8 +408,8 @@ export function DashboardOverview({
             </div>
 
             {/* Right column */}
-            <div className="space-y-6">
-              <Card className="border-0 bg-slate-900 text-white">
+            <div className="min-w-0 space-y-6">
+              <Card className="min-w-0 w-full max-w-full overflow-hidden border-0 bg-slate-900 text-white">
                 <CardHeader>
                   <CardTitle className="text-white">Top Products</CardTitle>
                 </CardHeader>
@@ -405,7 +430,7 @@ export function DashboardOverview({
                 </CardContent>
               </Card>
 
-              <Card className={lowStock.length > 0 ? "border-0 bg-red-600 text-white" : ""}>
+              <Card className={cn("min-w-0 w-full max-w-full overflow-hidden", lowStock.length > 0 ? "border-0 bg-red-600 text-white" : "")}>
                 <CardHeader>
                   <CardTitle className={lowStock.length > 0 ? "flex items-center gap-2 text-white" : "flex items-center gap-2"}>
                     <AlertTriangle className="h-5 w-5" /> Inventory Alerts
@@ -435,7 +460,6 @@ export function DashboardOverview({
             </div>
           </div>
         </main>
-      </div>
-    </>
+    </div>
   )
 }
