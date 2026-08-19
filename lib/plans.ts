@@ -84,7 +84,7 @@ export const PLANS: Record<PlanId, Plan> = {
       /** dedicatedAccountManager: false, */
       customStoreDesign: true,
     },
-    highlights: ["Everything in Basic", "Instagram integration", "Custom domain", "Custom store design builder"],
+    highlights: ["Everything in Starter", "Instagram integration", "Custom domain", "Custom store design builder"],
   },
   /**growth: {
     id: "growth",

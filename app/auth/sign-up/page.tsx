@@ -23,7 +23,7 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [accountType, setAccountType] = useState<AccountType>("personal")
-  const [intendedPlan, setIntendedPlan] = useState<PlanId>("basic")
+  const [intendedPlan, setIntendedPlan] = useState<PlanId>("Starter")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingUser, setExistingUser] = useState(false)
