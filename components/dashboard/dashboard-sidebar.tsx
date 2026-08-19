@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Sparkles,
   Menu,
+  Palette,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
@@ -142,6 +143,12 @@ function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
               icon={Gift}
               label="Promotions"
               active={pathname === "/dashboard/promotions"}
+            />
+            <NavLink
+              href="/dashboard/design"
+              icon={Palette}
+              label="Design"
+              active={pathname === "/dashboard/design"}
             />
           </div>
         </div>

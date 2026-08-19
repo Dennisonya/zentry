@@ -1,44 +1,40 @@
-// lib/page-builder/types.ts
-import { z } from "zod";
+import type { z } from "zod"
+import type {
+  heroSettingsSchema,
+  productGridSettingsSchema,
+  serviceGridSettingsSchema,
+  aboutSettingsSchema,
+  contactInfoSettingsSchema,
+} from "@/lib/page-builder/block-schemas"
 
-export type BlockType = "hero" | "product-grid" | "service-grid" | "about" | "contact-info";
+export type BlockType = "hero" | "product-grid" | "service-grid" | "about" | "contact-info"
 
-export interface Block<T = any> {
-  id: string;
-  type: BlockType;
-  isVisible: boolean;
-  settings: T;
+export type BlockSettingsMap = {
+  hero: z.infer<typeof heroSettingsSchema>
+  "product-grid": z.infer<typeof productGridSettingsSchema>
+  "service-grid": z.infer<typeof serviceGridSettingsSchema>
+  about: z.infer<typeof aboutSettingsSchema>
+  "contact-info": z.infer<typeof contactInfoSettingsSchema>
 }
+
+interface BlockBase {
+  /** Stable id, generated once when the block is added — used for React keys and drag-reordering. */
+  id: string
+  visible: boolean
+}
+
+/** Discriminated union — `block.type` narrows `block.settings` automatically. */
+export type Block = {
+  [K in BlockType]: BlockBase & { type: K; settings: BlockSettingsMap[K] }
+}[BlockType]
 
 export interface PageSchema {
-  version: string;
-  blocks: Block[];
+  schemaVersion: 1
+  blocks: Block[]
 }
 
-// We define basic Zod schemas here so the Phase C settings form has them ready.
-export const HeroSettingsSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  subtitle: z.string().optional(),
-  ctaText: z.string().optional(),
-  ctaLink: z.string().optional(),
-  imageUrl: z.string().url().optional().or(z.literal("")),
-});
-
-export const GridSettingsSchema = z.object({
-  title: z.string(),
-  maxItems: z.number().min(1).max(20).default(6),
-  categoryFilter: z.string().optional(), // 'all' or specific category
-});
-
-export const AboutSettingsSchema = z.object({
-  title: z.string(),
-  content: z.string(),
-  imageUrl: z.string().optional(),
-});
-
-export const ContactSettingsSchema = z.object({
-  title: z.string().default("Contact Us"),
-  showAddress: z.boolean().default(true),
-  showEmail: z.boolean().default(true),
-  showPhone: z.boolean().default(true),
-});
+export function isPageSchema(value: unknown): value is PageSchema {
+  if (!value || typeof value !== "object") return false
+  const v = value as Record<string, unknown>
+  return v.schemaVersion === 1 && Array.isArray(v.blocks)
+}

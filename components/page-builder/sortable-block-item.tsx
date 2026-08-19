@@ -29,7 +29,7 @@ export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibil
       style={style}
       className={`flex items-center gap-2 p-3 mb-2 bg-background border rounded-md cursor-pointer transition-colors ${
         isSelected ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/50"
-      } ${!block.isVisible ? "opacity-50" : ""}`}
+      } ${!block.visible ? "opacity-50" : ""}`}
       onClick={() => onSelect(block.id)}
     >
       {/* Drag Handle */}
@@ -50,7 +50,7 @@ export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibil
         }}
         className="text-muted-foreground hover:text-foreground p-1"
       >
-        {block.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+        {block.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
       </button>
     </div>
   )
