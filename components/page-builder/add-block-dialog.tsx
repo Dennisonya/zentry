@@ -1,24 +1,30 @@
-// components/page-builder/add-block-dialog.tsx
-import React from "react"
-import { Plus, LayoutTemplate } from "lucide-react"
+"use client"
+
+import { useState } from "react"
+import { Plus } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { blockRegistry } from "@/lib/page-builder/block-registry"
-import { BlockType } from "@/lib/page-builder/types"
+import { blockRegistry, BLOCK_TYPES } from "@/lib/page-builder/block-registry"
+import type { BlockType } from "@/lib/page-builder/types"
+
+const BLOCK_DESCRIPTIONS: Record<BlockType, string> = {
+  hero: "Business name, logo, and description at the top of the page.",
+  "product-grid": "Your products, optionally grouped by category.",
+  "service-grid": "Your bookable services.",
+  about: "A custom text section — falls back to your business description.",
+  "contact-info": "Phone, email, address, WhatsApp, and Instagram.",
+}
 
 interface AddBlockDialogProps {
   onAddBlock: (type: BlockType) => void
 }
 
 export function AddBlockDialog({ onAddBlock }: AddBlockDialogProps) {
-  const [open, setOpen] = React.useState(false)
-
-  // Grab all available block types from your registry
-  const availableBlocks = Object.values(blockRegistry)
+  const [open, setOpen] = useState(false)
 
   const handleSelect = (type: BlockType) => {
     onAddBlock(type)
-    setOpen(false) // Close modal after selection
+    setOpen(false)
   }
 
   return (
@@ -30,27 +36,30 @@ export function AddBlockDialog({ onAddBlock }: AddBlockDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a new section</DialogTitle>
-          <DialogDescription>
-            Choose a section type to append to your storefront page.
-          </DialogDescription>
+          <DialogTitle>Add a section</DialogTitle>
+          <DialogDescription>Choose a section type to add to your storefront page.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-3 py-4">
-          {availableBlocks.map((config) => (
-            <div
-              key={config.type}
-              onClick={() => handleSelect(config.type)}
-              className="flex items-center gap-4 p-3 border rounded-lg hover:border-primary hover:bg-muted/50 cursor-pointer transition-all"
-            >
-              <div className="bg-primary/10 p-2.5 rounded-md text-primary">
-                <LayoutTemplate className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-sm">{config.label}</h4>
-                <p className="text-xs text-muted-foreground">Add a customizable {config.label.toLowerCase()} section.</p>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 gap-3 py-2">
+          {BLOCK_TYPES.map((type) => {
+            const config = blockRegistry[type]
+            const Icon = config.icon
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleSelect(type)}
+                className="flex items-center gap-4 p-3 border rounded-lg hover:border-primary hover:bg-muted/50 cursor-pointer transition-all text-left"
+              >
+                <div className="bg-primary/10 p-2.5 rounded-md text-primary shrink-0">
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm">{config.label}</h4>
+                  <p className="text-xs text-muted-foreground">{BLOCK_DESCRIPTIONS[type]}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </DialogContent>
     </Dialog>

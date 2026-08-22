@@ -12,14 +12,16 @@ import {
 } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { restrictToVerticalAxis, restrictToWindowEdges } from "@dnd-kit/modifiers"
-import { Plus, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 import type { Business, Product, Service } from "@/components/dashboard-content"
-import type { Block, PageSchema } from "@/lib/page-builder/types"
+import type { Block, BlockType, PageSchema } from "@/lib/page-builder/types"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
 import { blockRegistry } from "@/lib/page-builder/block-registry"
+import { generateBlockId } from "@/lib/page-builder/generate-id"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { SortableBlockItem } from "./sortable-block-item"
+import { AddBlockDialog } from "./add-block-dialog"
 import { Button } from "@/components/ui/button"
 import { getSupabaseClient } from "@/lib/supabase"
 
@@ -68,6 +70,23 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
 
   const toggleVisibility = (id: string) => {
     setBlocks(blocks.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)))
+  }
+
+  const addBlock = (type: BlockType) => {
+    const def = blockRegistry[type]
+    const newBlock = {
+      id: generateBlockId(),
+      type,
+      visible: true,
+      settings: def.defaultSettings,
+    } as Block
+    setBlocks((items) => [...items, newBlock])
+    setSelectedBlockId(newBlock.id)
+  }
+
+  const removeBlock = (id: string) => {
+    setBlocks((items) => items.filter((b) => b.id !== id))
+    setSelectedBlockId((current) => (current === id ? null : current))
   }
 
   const discardChanges = () => {
@@ -146,14 +165,13 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
                     isSelected={block.id === selectedBlockId}
                     onSelect={setSelectedBlockId}
                     onToggleVisibility={toggleVisibility}
+                    onRemove={removeBlock}
                   />
                 ))}
               </SortableContext>
             </DndContext>
 
-            <Button variant="outline" className="w-full mt-4 flex items-center gap-2" disabled>
-              <Plus className="w-4 h-4" /> Add Section
-            </Button>
+            <AddBlockDialog onAddBlock={addBlock} />
           </div>
         </aside>
 

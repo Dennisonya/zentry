@@ -1,19 +1,20 @@
-// components/page-builder/sortable-block-item.tsx
-import React from "react"
+"use client"
+
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Eye, EyeOff } from "lucide-react"
-import { Block } from "@/lib/page-builder/types"
+import { GripVertical, Eye, EyeOff, Trash2 } from "lucide-react"
+import type { Block } from "@/lib/page-builder/types"
 import { blockRegistry } from "@/lib/page-builder/block-registry"
 
 interface Props {
-  block: Block;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
-  onToggleVisibility: (id: string) => void;
+  block: Block
+  isSelected: boolean
+  onSelect: (id: string) => void
+  onToggleVisibility: (id: string) => void
+  onRemove: (id: string) => void
 }
 
-export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibility }: Props) {
+export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibility, onRemove }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: block.id })
 
   const style = {
@@ -22,6 +23,7 @@ export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibil
   }
 
   const config = blockRegistry[block.type]
+  const Icon = config?.icon
 
   return (
     <div
@@ -36,21 +38,34 @@ export function SortableBlockItem({ block, isSelected, onSelect, onToggleVisibil
       <div {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
         <GripVertical className="w-4 h-4" />
       </div>
-      
+
+      {Icon && <Icon className="w-4 h-4 text-muted-foreground shrink-0" />}
+
       {/* Block Name */}
-      <span className="flex-1 text-sm font-medium">
-        {config?.label || "Unknown Block"}
-      </span>
+      <span className="flex-1 text-sm font-medium truncate">{config?.label || "Unknown Block"}</span>
 
       {/* Visibility Toggle */}
-      <button 
+      <button
         onClick={(e) => {
-          e.stopPropagation(); // Don't trigger block selection
-          onToggleVisibility(block.id);
+          e.stopPropagation()
+          onToggleVisibility(block.id)
         }}
         className="text-muted-foreground hover:text-foreground p-1"
+        title={block.visible ? "Hide section" : "Show section"}
       >
         {block.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+      </button>
+
+      {/* Remove */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove(block.id)
+        }}
+        className="text-muted-foreground hover:text-destructive p-1"
+        title="Remove section"
+      >
+        <Trash2 className="w-4 h-4" />
       </button>
     </div>
   )

@@ -39,6 +39,18 @@ export interface Business {
   description: string | null
   whatsapp_number: string | null
   instagram_handle: string | null
+  logo_url: string | null
+  theme_color: string
+  accent_color?: string | null
+  hero_image_url: string | null
+  layout_style?: string
+  subscription_plan?: string | null
+  subscription_status?: string | null
+  /** Live custom store design — null means still on the stock template (layout_style). */
+  page_schema?: import("@/lib/page-builder/types").PageSchema | null
+  /** Working copy the design builder edits; not visible to customers until published. */
+  page_schema_draft?: import("@/lib/page-builder/types").PageSchema | null
+  page_schema_updated_at?: string | null
 }
 
 export interface Product {

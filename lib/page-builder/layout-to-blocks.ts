@@ -1,10 +1,7 @@
 import { blockRegistry, BLOCK_TYPES } from "@/lib/page-builder/block-registry"
+import { generateBlockId } from "@/lib/page-builder/generate-id"
 import type { PageSchema } from "@/lib/page-builder/types"
 
-function generateId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
-  return Math.random().toString(36).slice(2, 10)
-}
 
 /**
  * Converts a business's current stock template into an equivalent starter
@@ -18,7 +15,7 @@ export function convertLayoutToSchema(): PageSchema {
   return {
     schemaVersion: 1,
     blocks: BLOCK_TYPES.map((type) => ({
-      id: generateId(),
+      id: generateBlockId(),
       type,
       visible: true,
       settings: blockRegistry[type].defaultSettings,
