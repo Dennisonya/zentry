@@ -18,10 +18,11 @@ import type { Business, Product, Service } from "@/components/dashboard-content"
 import type { Block, BlockType, PageSchema } from "@/lib/page-builder/types"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
 import { blockRegistry } from "@/lib/page-builder/block-registry"
-import { generateBlockId } from "@/lib/page-builder/generate-id"
+import { generateBlockId } from "@/lib/page-builder/block-utils"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { SortableBlockItem } from "./sortable-block-item"
 import { AddBlockDialog } from "./add-block-dialog"
+import { SettingsInspector } from "./settings-inspector"
 import { Button } from "@/components/ui/button"
 import { getSupabaseClient } from "@/lib/supabase"
 
@@ -29,7 +30,6 @@ interface BuilderCanvasProps {
   business: Business
   products: Product[]
   services: Service[]
-  /** Called after a successful Save/Publish so the parent can refetch the business row. */
   onSaved?: () => void
 }
 
@@ -43,8 +43,6 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Re-seed local state whenever the underlying business record changes
-  // (e.g. after a Save/Publish round-trip refetches it via onSaved).
   useEffect(() => {
     const schema = startingSchema(business)
     setBlocks(schema.blocks)
@@ -69,7 +67,7 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
   }
 
   const toggleVisibility = (id: string) => {
-    setBlocks(blocks.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)))
+    setBlocks((items) => items.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)))
   }
 
   const addBlock = (type: BlockType) => {
@@ -87,6 +85,12 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
   const removeBlock = (id: string) => {
     setBlocks((items) => items.filter((b) => b.id !== id))
     setSelectedBlockId((current) => (current === id ? null : current))
+  }
+
+  const updateBlockSettings = (id: string, settings: Block["settings"]) => {
+    setBlocks((items) =>
+      items.map((block) => (block.id === id ? ({ ...block, settings } as Block) : block)),
+    )
   }
 
   const discardChanges = () => {
@@ -121,8 +125,7 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
 
   return (
     <div className="flex h-full w-full flex-col bg-muted/20">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b bg-background px-4 py-2.5 shrink-0">
+      <div className="flex shrink-0 items-center justify-between border-b bg-background px-4 py-2.5">
         <div className="text-sm text-muted-foreground">
           {business.page_schema_updated_at
             ? `Last saved ${new Date(business.page_schema_updated_at).toLocaleString()}`
@@ -130,26 +133,21 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
           {error && <span className="ml-3 text-destructive">{error}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={discardChanges} disabled={saving !== null}>
-            Discard changes
-          </Button>
+          <Button variant="outline" size="sm" onClick={discardChanges} disabled={saving !== null}>Discard changes</Button>
           <Button variant="outline" size="sm" onClick={() => persist("draft")} disabled={saving !== null}>
-            {saving === "draft" && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
+            {saving === "draft" && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
             Save draft
           </Button>
           <Button size="sm" onClick={() => persist("publish")} disabled={saving !== null}>
-            {saving === "publish" && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
+            {saving === "publish" && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
             Publish
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 w-full">
-        {/* LEFT COLUMN: Layers & Structure */}
-        <aside className="w-72 bg-background border-r flex flex-col shrink-0">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold text-sm">Page Sections</h2>
-          </div>
+      <div className="flex min-h-0 w-full flex-1">
+        <aside className="flex w-72 shrink-0 flex-col border-r bg-background">
+          <div className="border-b p-4"><h2 className="text-sm font-semibold">Page Sections</h2></div>
           <div className="flex-1 overflow-y-auto p-4">
             <DndContext
               sensors={sensors}
@@ -170,15 +168,12 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
                 ))}
               </SortableContext>
             </DndContext>
-
             <AddBlockDialog onAddBlock={addBlock} />
           </div>
         </aside>
 
-        {/* CENTER COLUMN: Live Preview Canvas */}
-        <main className="flex-1 overflow-y-auto relative flex justify-center p-8">
-          <div className="w-full max-w-[1200px] bg-white border shadow-sm rounded-lg overflow-hidden min-h-[800px]">
-            {/* Same renderer the live storefront uses — what you see here is what publishing ships. */}
+        <main className="relative flex flex-1 justify-center overflow-y-auto p-8">
+          <div className="min-h-[800px] w-full max-w-[1200px] overflow-hidden rounded-lg border bg-white shadow-sm">
             <BlockRenderer
               schema={{ schemaVersion: 1, blocks }}
               business={business}
@@ -189,23 +184,26 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
           </div>
         </main>
 
-        {/* RIGHT COLUMN: Settings Inspector */}
-        <aside className="w-80 bg-background border-l flex flex-col shrink-0">
-          <div className="p-4 border-b">
-            <h2 className="font-semibold text-sm">
+        <aside className="flex w-80 shrink-0 flex-col border-l bg-background">
+          <div className="border-b p-4">
+            <h2 className="text-sm font-semibold">
               {selectedBlock ? blockRegistry[selectedBlock.type]?.label : "Settings"}
             </h2>
+            {selectedBlock && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Edit this section and changes will appear instantly in the preview.
+              </p>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {selectedBlock ? (
-              <div className="text-sm text-muted-foreground border-2 border-dashed p-4 rounded text-center">
-                [Form for {selectedBlock.type} settings goes here]
-                <br />
-                <br />
-                Next step: react-hook-form dynamically rendering inputs based on this block's zod schema.
-              </div>
+              <SettingsInspector
+                block={selectedBlock}
+                businessId={business.id}
+                onChange={(settings) => updateBlockSettings(selectedBlock.id, settings)}
+              />
             ) : (
-              <div className="text-sm text-muted-foreground text-center mt-10">
+              <div className="mt-10 text-center text-sm text-muted-foreground">
                 Select a section to edit its settings.
               </div>
             )}

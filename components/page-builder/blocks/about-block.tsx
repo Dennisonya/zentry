@@ -1,13 +1,19 @@
-import type {BlockRenderProps} from "@/lib/page-builder/block-registry"
+import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+
+const alignmentClass = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+} as const
 
 export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
-    const body = settings.body || business.description
-    if (!body) return null
-  
-    return (
-      <section className="container mx-auto px-4 py-12 max-w-3xl text-center">
-        <h2 className="text-3xl font-bold mb-6">{settings.title}</h2>
-        <p className="text-muted-foreground text-lg leading-relaxed whitespace-pre-line">{body}</p>
-      </section>
-    )
-  }
+  const body = settings.body || business.description
+  if (!body) return null
+
+  return (
+    <section className={`container mx-auto max-w-3xl px-4 py-12 ${alignmentClass[settings.alignment]}`}>
+      <h2 className="mb-6 text-3xl font-bold">{settings.title}</h2>
+      <p className="whitespace-pre-line text-lg leading-relaxed text-muted-foreground">{body}</p>
+    </section>
+  )
+}

@@ -10,15 +10,21 @@ function money(n: number) {
   return Number.isFinite(x) ? x.toFixed(2) : "0.00"
 }
 
+const alignmentClass = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+} as const
+
 export function ProductGridBlock({ products, settings, onOrderProduct }: BlockRenderProps<"product-grid">) {
   const groups = settings.groupByCategory ? groupByCategory(products) : [{ category: "", items: products }]
 
   return (
     <section className="container mx-auto px-4 py-12">
-      <h2 className="text-3xl font-bold text-center mb-10">{settings.title}</h2>
+      <h2 className={`mb-10 text-3xl font-bold ${alignmentClass[settings.titleAlignment]}`}>{settings.title}</h2>
       {products.length === 0 ? (
-        <div className="text-center py-12">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <div className="py-12 text-center">
+          <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <p className="text-muted-foreground">No products yet — check back soon!</p>
         </div>
       ) : (
@@ -26,33 +32,22 @@ export function ProductGridBlock({ products, settings, onOrderProduct }: BlockRe
           {groups.map((group) => (
             <div key={group.category || "all"}>
               {settings.groupByCategory && groups.length > 1 && (
-                <h3 className="text-xl font-semibold mb-6 pb-2 border-b">{group.category}</h3>
+                <h3 className="mb-6 border-b pb-2 text-xl font-semibold">{group.category}</h3>
               )}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.items.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
-                  >
+                  <Card key={product.id} className="group overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                     {product.image_url && (
                       <div className="aspect-square overflow-hidden bg-muted">
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
+                        <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
                       </div>
                     )}
                     <CardContent className="p-5">
-                      <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                      {product.description && (
-                        <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
-                      )}
+                      <h3 className="mb-1 text-lg font-semibold">{product.name}</h3>
+                      {product.description && <p className="mb-3 text-sm text-muted-foreground">{product.description}</p>}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold">${money(product.price)}</span>
-                        <Button size="sm" onClick={() => onOrderProduct(product)}>
-                          Order
-                        </Button>
+                        <Button size="sm" onClick={() => onOrderProduct(product)}>Order</Button>
                       </div>
                     </CardContent>
                   </Card>

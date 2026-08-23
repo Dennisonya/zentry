@@ -1,38 +1,43 @@
 import { z } from "zod"
 
-// One schema per block type. This is the contract: anything written to
-// page_schema / page_schema_draft — by the builder UI, or by hand while
-// testing — should validate against these before being trusted.
+// The schema is the contract for both validation and the design inspector.
+// Keep editor-facing values serializable so they can live safely in page_schema.
 
 export const heroSettingsSchema = z.object({
   showLogo: z.boolean().default(true),
   showDescription: z.boolean().default(true),
-  /** Overrides business.hero_image_url when set; falls back to it when null. */
   heroImageUrl: z.string().url().nullable().default(null),
+  heading: z.string().max(120).default(""),
+  description: z.string().max(500).default(""),
+  contentAlignment: z.enum(["left", "center", "right"]).default("center"),
+  contentVerticalAlignment: z.enum(["top", "center", "bottom"]).default("center"),
 })
 
 export const productGridSettingsSchema = z.object({
-  title: z.string().min(1).max(80).default("Our Products"),
+  title: z.string().max(80).default("Our Products"),
   groupByCategory: z.boolean().default(true),
+  titleAlignment: z.enum(["left", "center", "right"]).default("center"),
 })
 
 export const serviceGridSettingsSchema = z.object({
-  title: z.string().min(1).max(80).default("Our Services"),
+  title: z.string().max(80).default("Our Services"),
+  titleAlignment: z.enum(["left", "center", "right"]).default("center"),
 })
 
 export const aboutSettingsSchema = z.object({
-  title: z.string().min(1).max(80).default("About Us"),
-  /** Custom body text; falls back to business.description when null. */
+  title: z.string().max(80).default("About Us"),
   body: z.string().max(2000).nullable().default(null),
+  alignment: z.enum(["left", "center", "right"]).default("center"),
 })
 
 export const contactInfoSettingsSchema = z.object({
-  title: z.string().min(1).max(80).default("Get in Touch"),
+  title: z.string().max(80).default("Get in Touch"),
   showPhone: z.boolean().default(true),
   showEmail: z.boolean().default(true),
   showAddress: z.boolean().default(true),
   showWhatsapp: z.boolean().default(true),
   showInstagram: z.boolean().default(true),
+  alignment: z.enum(["left", "center", "right"]).default("center"),
 })
 
 export const blockSettingsSchemas = {

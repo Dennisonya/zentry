@@ -1,5 +1,5 @@
 import { blockRegistry, BLOCK_TYPES } from "@/lib/page-builder/block-registry"
-import { generateBlockId } from "@/lib/page-builder/generate-id"
+import { generateBlockId } from "@/lib/page-builder/block-utils"
 import type { PageSchema } from "@/lib/page-builder/types"
 
 
