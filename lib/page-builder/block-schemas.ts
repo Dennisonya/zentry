@@ -11,6 +11,9 @@ export const heroSettingsSchema = z.object({
   description: z.string().max(500).default(""),
   contentAlignment: z.enum(["left", "center", "right"]).default("center"),
   contentVerticalAlignment: z.enum(["top", "center", "bottom"]).default("center"),
+  // Controls the focal point of object-fit: cover without using fragile pixel positioning.
+  imagePositionX: z.number().min(0).max(100).default(50),
+  imagePositionY: z.number().min(0).max(100).default(50),
 })
 
 export const productGridSettingsSchema = z.object({
