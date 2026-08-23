@@ -1,7 +1,8 @@
 "use client"
 
-import { BusinessPageWithLayout } from "./business-layouts"
-import { type LayoutStyle } from "@/lib/layouts"
+import { BlockRenderer } from "@/components/page-builder/block-renderer"
+import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
+import type { PageSchema } from "@/lib/page-builder/types"
 
 export interface Business {
   id: string
@@ -16,10 +17,9 @@ export interface Business {
   theme_color: string
   whatsapp_number: string | null
   instagram_handle: string | null
-  layout_style?: LayoutStyle
   accent_color?: string | null
   hero_image_url?: string | null
-  dark_mode_enabled?: boolean
+  page_schema?: PageSchema | null
 }
 
 export interface Product {
@@ -48,13 +48,21 @@ interface BusinessPageProps {
   services: Service[]
 }
 
+/**
+ * The public storefront and the design studio intentionally use the same
+ * renderer. A published page_schema is therefore the live storefront. When
+ * no schema exists yet, the classic Zentry block layout is generated from the
+ * registry defaults, giving every business one stable starting design.
+ */
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
+  const schema = business.page_schema || convertLayoutToSchema()
+
   return (
-    <BusinessPageWithLayout
-      business={business as Business}
-      products={products as Product[]}
-      services={services as Service[]}
-      layoutStyle={business.layout_style}
+    <BlockRenderer
+      schema={schema}
+      business={business}
+      products={products}
+      services={services}
     />
   )
 }
