@@ -18,7 +18,7 @@ import type { Business, Product, Service } from "@/components/dashboard-content"
 import type { Block, BlockType, PageSchema } from "@/lib/page-builder/types"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
 import { blockRegistry } from "@/lib/page-builder/block-registry"
-import { generateBlockId } from "@/lib/page-builder/block-utils"
+import { generateBlockId, cloneSettings } from "@/lib/page-builder/block-utils"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { SortableBlockItem } from "./sortable-block-item"
 import { AddBlockDialog } from "./add-block-dialog"
@@ -76,7 +76,7 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
       id: generateBlockId(),
       type,
       visible: true,
-      settings: def.defaultSettings,
+      settings: cloneSettings(def.defaultSettings),
     } as Block
     setBlocks((items) => [...items, newBlock])
     setSelectedBlockId(newBlock.id)
