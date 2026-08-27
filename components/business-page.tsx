@@ -1,8 +1,10 @@
 "use client"
 
+import { BusinessPageWithLayout } from "./business-layouts"
+import { type LayoutStyle } from "@/lib/layouts"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
-import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
-import type { PageSchema } from "@/lib/page-builder/types"
+import { isPageSchema } from "@/lib/page-builder/types"
+import { hasFeature } from "@/lib/plan-access"
 
 export interface Business {
   id: string
@@ -17,9 +19,13 @@ export interface Business {
   theme_color: string
   whatsapp_number: string | null
   instagram_handle: string | null
+  layout_style?: LayoutStyle
   accent_color?: string | null
-  hero_image_url?: string | null
-  page_schema?: PageSchema | null
+  hero_image_url: string | null
+  dark_mode_enabled?: boolean
+  subscription_plan?: string | null
+  subscription_status?: string | null
+  page_schema?: unknown
 }
 
 export interface Product {
@@ -48,21 +54,24 @@ interface BusinessPageProps {
   services: Service[]
 }
 
-/**
- * The public storefront and the design studio intentionally use the same
- * renderer. A published page_schema is therefore the live storefront. When
- * no schema exists yet, the classic Zentry block layout is generated from the
- * registry defaults, giving every business one stable starting design.
- */
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
-  const schema = business.page_schema || convertLayoutToSchema()
+  // A Pro business with a published custom design renders through the
+  // block builder instead of a stock template. The Pro check here is
+  // defense in depth — migration 011's downgrade trigger already nulls
+  // page_schema when a business leaves Pro, but a stale client-side
+  // schema should never render even if that somehow lagged.
+  if (business.page_schema && isPageSchema(business.page_schema) && hasFeature(business, "customStoreDesign")) {
+    return (
+      <BlockRenderer schema={business.page_schema} business={business as any} products={products} services={services} />
+    )
+  }
 
   return (
-    <BlockRenderer
-      schema={schema}
-      business={business}
-      products={products}
-      services={services}
+    <BusinessPageWithLayout
+      business={business as Business}
+      products={products as Product[]}
+      services={services as Service[]}
+      layoutStyle={business.layout_style}
     />
   )
 }

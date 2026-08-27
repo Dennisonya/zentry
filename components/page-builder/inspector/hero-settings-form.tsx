@@ -9,6 +9,7 @@ interface Props {
 }
 
 export function HeroSettingsForm({ settings, onChange }: Props) {
+  
   return (
     <FieldGroup>
       <ToggleField

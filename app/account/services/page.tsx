@@ -1,0 +1,14 @@
+"use client"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { format, parseISO } from "date-fns"
+import { BookOpenCheck, CalendarDays } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase"
+import { AccountShell } from "@/components/account/account-shell"
+import { MobileAccountNav } from "@/components/account/account-sidebar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+type Booking={id:string;status:string;booking_date:string|null;booking_time:string|null;notes:string|null;created_at:string;businesses?:{business_name:string;slug:string}|null;services?:{name:string}|null}
+export default function ServicesPage(){const r=useRouter();const [loading,setLoading]=useState(true);const [rows,setRows]=useState<Booking[]>([]);useEffect(()=>{(async()=>{const s=getSupabaseClient();const {data:{user}}=await s.auth.getUser();if(!user){r.replace("/auth/login?next=/account/services");return}const {data}=await s.from("bookings").select("id,status,booking_date,booking_time,notes,created_at,businesses(business_name,slug),services(name)").eq("customer_id",user.id).order("created_at",{ascending:false});setRows((data as Booking[])||[]);setLoading(false)})()},[r]);return <AccountShell><main className="mx-auto max-w-5xl px-5 py-6 sm:px-6 lg:px-8 lg:py-8"><header className="mb-8 flex items-center gap-3"><MobileAccountNav/><div><p className="text-sm text-muted-foreground">Bookings & appointments</p><h1 className="text-3xl font-bold">My services</h1></div></header>{loading?<p className="text-muted-foreground">Loading services...</p>:rows.length===0?<Card className="border-dashed"><CardContent className="py-20 text-center"><BookOpenCheck className="mx-auto h-8 w-8 text-purple-600"/><h2 className="mt-4 text-xl font-semibold">No services booked yet</h2><Button asChild className="mt-5 rounded-xl"><Link href="/marketplace">Find a service</Link></Button></CardContent></Card>:<div className="grid gap-4 md:grid-cols-2">{rows.map(b=><Card key={b.id} className="shadow-sm"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div className="rounded-xl bg-purple-100 p-3 text-purple-700"><CalendarDays className="h-5 w-5"/></div><Badge variant="secondary" className="capitalize">{b.status}</Badge></div><h2 className="mt-5 font-semibold">{b.services?.name||"Service booking"}</h2><p className="mt-1 text-sm text-muted-foreground">{b.businesses?.business_name||"Zentry business"}</p><div className="mt-5 rounded-xl bg-muted/60 p-3 text-sm">{b.booking_date?format(parseISO(b.booking_date),"EEEE, MMMM d"):"Date pending"}{b.booking_time?` · ${b.booking_time.slice(0,5)}`:""}</div>{b.notes&&<p className="mt-3 text-sm text-muted-foreground">{b.notes}</p>}</CardContent></Card>)}</div>}</main></AccountShell>}
