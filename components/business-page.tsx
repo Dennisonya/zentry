@@ -93,7 +93,7 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
         onOpenChange={setCartOpen}
         businessId={business.id}
         businessName={business.business_name}
-        slug=""
+        whatsappNumber={business.whatsapp_number}
         items={cartItems}
         onQuantityChange={changeQuantity}
         onRemove={removeProduct}
