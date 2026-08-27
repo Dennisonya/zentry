@@ -1,7 +1,7 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ShoppingCart } from "lucide-react"
+import { ShoppingCart, Check } from "lucide-react"
 import { groupByCategory } from "@/lib/product-categories"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 
@@ -16,8 +16,15 @@ const alignmentClass = {
   right: "text-right",
 } as const
 
-export function ProductGridBlock({ products, settings, onOrderProduct }: BlockRenderProps<"product-grid">) {
+export function ProductGridBlock({ products, settings, onAddToCart }: BlockRenderProps<"product-grid">) {
   const groups = settings.groupByCategory ? groupByCategory(products) : [{ category: "", items: products }]
+  const [addedProductId, setAddedProductId] = useState<string | null>(null)
+
+  const handleAdd = (product: (typeof products)[number]) => {
+    onAddToCart(product)
+    setAddedProductId(product.id)
+    window.setTimeout(() => setAddedProductId((current) => (current === product.id ? null : current)), 1200)
+  }
 
   return (
     <section className="container mx-auto px-4 py-12">
@@ -45,9 +52,12 @@ export function ProductGridBlock({ products, settings, onOrderProduct }: BlockRe
                     <CardContent className="p-5">
                       <h3 className="mb-1 text-lg font-semibold">{product.name}</h3>
                       {product.description && <p className="mb-3 text-sm text-muted-foreground">{product.description}</p>}
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-lg font-bold">${money(product.price)}</span>
-                        <Button size="sm" onClick={() => onOrderProduct(product)}>Order</Button>
+                        <Button size="sm" onClick={() => handleAdd(product)}>
+                          {addedProductId === product.id ? <Check className="mr-2 h-4 w-4" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
+                          {addedProductId === product.id ? "Added" : "Add to cart"}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
