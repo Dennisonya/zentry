@@ -61,7 +61,6 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
   const addProduct = (product: Product) => {
     addToStoreCart(business.id, product)
     syncCart()
-    setCartOpen(true)
   }
 
   const changeQuantity = (productId: string, quantity: number) => {
