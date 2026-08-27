@@ -15,13 +15,12 @@ import { ServiceGridBlock } from "@/components/page-builder/blocks/service-grid-
 import { AboutBlock } from "@/components/page-builder/blocks/about-block"
 import { ContactInfoBlock } from "@/components/page-builder/blocks/contact-info-block"
 
-/** Data every block render component receives on top of its own settings. */
 export interface BlockRenderProps<T extends BlockType> {
   settings: BlockSettingsMap[T]
   business: Business
   products: Product[]
   services: Service[]
-  onOrderProduct: (product: Product) => void
+  onAddToCart: (product: Product) => void
   onBookService: (service: Service) => void
 }
 
@@ -33,10 +32,6 @@ interface BlockDefinition<T extends BlockType> {
   Render: ComponentType<BlockRenderProps<T>>
 }
 
-// Each block's default settings come from its zod schema's own .parse({}),
-// so the registry can never drift from the validation contract in
-// block-schemas.ts — there's only one place that defines "what a hero
-// block looks like by default."
 export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
   hero: {
     type: "hero",
