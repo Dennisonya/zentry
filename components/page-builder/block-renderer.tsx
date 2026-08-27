@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { EnhancedOrderDialog } from "@/components/enhanced-order-dialog"
 import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
 import { blockRegistry } from "@/lib/page-builder/block-registry"
 import type { PageSchema } from "@/lib/page-builder/types"
@@ -12,14 +11,19 @@ interface BlockRendererProps {
   business: Business
   products: Product[]
   services: Service[]
-  /** Builder preview passes true to render hidden blocks dimmed instead of skipping them. */
   showHidden?: boolean
+  onAddToCart: (product: Product) => void
 }
 
-export function BlockRenderer({ schema, business, products, services, showHidden }: BlockRendererProps) {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+export function BlockRenderer({
+  schema,
+  business,
+  products,
+  services,
+  showHidden,
+  onAddToCart,
+}: BlockRendererProps) {
   const [selectedService, setSelectedService] = useState<Service | null>(null)
-  const [orderDialogOpen, setOrderDialogOpen] = useState(false)
   const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
 
   const blocks = showHidden ? schema.blocks : schema.blocks.filter((b) => b.visible)
@@ -37,10 +41,7 @@ export function BlockRenderer({ schema, business, products, services, showHidden
               business={business}
               products={products}
               services={services}
-              onOrderProduct={(product: Product) => {
-                setSelectedProduct(product)
-                setOrderDialogOpen(true)
-              }}
+              onAddToCart={onAddToCart}
               onBookService={(service: Service) => {
                 setSelectedService(service)
                 setServiceInquiryOpen(true)
@@ -49,18 +50,6 @@ export function BlockRenderer({ schema, business, products, services, showHidden
           </div>
         )
       })}
-
-      {selectedProduct && (
-        <EnhancedOrderDialog
-          open={orderDialogOpen}
-          onOpenChange={setOrderDialogOpen}
-          product={selectedProduct}
-          businessId={business.id}
-          businessName={business.business_name}
-          whatsappNumber={business.whatsapp_number}
-          instagramHandle={business.instagram_handle}
-        />
-      )}
 
       <ServiceInquiryDialog
         open={serviceInquiryOpen}
@@ -73,7 +62,7 @@ export function BlockRenderer({ schema, business, products, services, showHidden
         instagramHandle={business.instagram_handle}
       />
 
-      <footer className="border-t bg-muted/20 mt-20">
+      <footer className="mt-20 border-t bg-muted/20">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
           <p>
             © {new Date().getFullYear()} <span className="font-semibold">Zentry</span> — All rights reserved.
