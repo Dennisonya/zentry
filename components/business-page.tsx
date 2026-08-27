@@ -1,8 +1,19 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
+import { StoreCartDrawer } from "@/components/storefront/store-cart-drawer"
+import {
+  addToStoreCart,
+  readStoreCart,
+  removeFromStoreCart,
+  updateStoreCartQuantity,
+  clearStoreCart,
+  type StoreCartItem,
+} from "@/lib/store-cart"
 import type { PageSchema } from "@/lib/page-builder/types"
+import type { Product, Service } from "@/components/business-layouts"
 
 export interface Business {
   id: string
@@ -22,47 +33,73 @@ export interface Business {
   page_schema?: PageSchema | null
 }
 
-export interface Product {
-  id: string
-  name: string
-  description: string | null
-  price: number
-  image_url: string | null
-  category: string | null
-}
-
-export interface Service {
-  id: string
-  name: string
-  description: string | null
-  price: number
-  image_url: string | null
-  category: string | null
-  duration_minutes: number | null
-  location: string | null
-}
-
 interface BusinessPageProps {
   business: Business
   products: Product[]
   services: Service[]
 }
 
-/**
- * The public storefront and the design studio intentionally use the same
- * renderer. A published page_schema is therefore the live storefront. When
- * no schema exists yet, the classic Zentry block layout is generated from the
- * registry defaults, giving every business one stable starting design.
- */
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
   const schema = business.page_schema || convertLayoutToSchema()
+  const [cartOpen, setCartOpen] = useState(false)
+  const [cartItems, setCartItems] = useState<StoreCartItem[]>([])
+
+  const syncCart = () => setCartItems(readStoreCart(business.id))
+
+  useEffect(() => {
+    syncCart()
+
+    const handleCartUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ businessId?: string }>
+      if (!customEvent.detail?.businessId || customEvent.detail.businessId === business.id) syncCart()
+    }
+
+    window.addEventListener("zentry:cart-updated", handleCartUpdate)
+    return () => window.removeEventListener("zentry:cart-updated", handleCartUpdate)
+  }, [business.id])
+
+  const addProduct = (product: Product) => {
+    addToStoreCart(business.id, product)
+    syncCart()
+    setCartOpen(true)
+  }
+
+  const changeQuantity = (productId: string, quantity: number) => {
+    updateStoreCartQuantity(business.id, productId, quantity)
+    syncCart()
+  }
+
+  const removeProduct = (productId: string) => {
+    removeFromStoreCart(business.id, productId)
+    syncCart()
+  }
+
+  const clearCart = () => {
+    clearStoreCart(business.id)
+    syncCart()
+  }
 
   return (
-    <BlockRenderer
-      schema={schema}
-      business={business}
-      products={products}
-      services={services}
-    />
+    <>
+      <BlockRenderer
+        schema={schema}
+        business={business}
+        products={products}
+        services={services}
+        onAddToCart={addProduct}
+      />
+
+      <StoreCartDrawer
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        businessId={business.id}
+        businessName={business.business_name}
+        slug=""
+        items={cartItems}
+        onQuantityChange={changeQuantity}
+        onRemove={removeProduct}
+        onClear={clearCart}
+      />
+    </>
   )
 }
