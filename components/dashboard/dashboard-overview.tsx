@@ -26,6 +26,7 @@ import { AddProductDialog } from "@/components/add-product-dialog"
 import { ProductList } from "@/components/product-list"
 import { ServiceList } from "@/components/service-list"
 import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
+import { DashboardPerformanceChart } from "@/components/dashboard/dashboard-performance-chart"
 import type { Business, Product, Service, Order, Booking as BaseBooking } from "@/components/dashboard-content"
 
 interface PageView {
@@ -33,8 +34,6 @@ interface PageView {
   viewed_at: string
 }
 
-// The bookings table has a service_id column that the shared Booking type
-// (used by the legacy dashboard view) doesn't declare. Extend it locally.
 type Booking = BaseBooking & { service_id?: string | null }
 
 interface DashboardOverviewProps {
@@ -112,7 +111,6 @@ export function DashboardOverview({
     }
   }
 
-  // ---- Stats ----
   const validOrders = orders.filter((o) => o.status !== "cancelled")
   const validBookings = bookings.filter((b) => b.status !== "cancelled")
 
@@ -131,7 +129,6 @@ export function DashboardOverview({
   const viewDates = pageViews.map((v) => parseISO(v.viewed_at))
   const viewsPct = monthOverMonth(viewDates, now)
 
-  // ---- Top products (by units sold from order_items) ----
   const productSales = validOrders.reduce((acc: Record<string, number>, order) => {
     const items = Array.isArray(order.order_items) ? order.order_items : []
     items.forEach((item: any) => {
@@ -145,14 +142,12 @@ export function DashboardOverview({
     .slice(0, 5)
     .map(([name, sales], i) => ({ name, sales, color: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }))
 
-  // ---- Inventory alerts ----
   const lowStock = products
     .filter((p: any) => p.track_inventory && p.stock_quantity !== null && p.stock_quantity !== undefined)
     .filter((p: any) => p.stock_quantity <= (p.low_stock_threshold ?? 5))
     .sort((a: any, b: any) => a.stock_quantity - b.stock_quantity)
     .slice(0, 5) as any[]
 
-  // ---- Recent activity ----
   type Activity = { id: string; label: string; sublabel: string; date: Date }
   const activities: Activity[] = [
     ...orders.map((o) => ({
@@ -174,28 +169,23 @@ export function DashboardOverview({
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 5)
 
-  // ---- Today's schedule ----
   const todaysBookings = bookings
     .filter((b) => b.status !== "cancelled" && isSameDay(parseISO(b.booking_date), now))
     .sort((a, b) => (a.booking_time > b.booking_time ? 1 : -1))
 
   const serviceNameById = new Map(services.map((s) => [s.id, s.name]))
-
   const firstName = (ownerName || business.business_name).split(" ")[0]
 
   return (
     <>
       <div className="mx-auto max-w-[1600px]">
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {/* Header */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <MobileDashboardNav />
               <div>
                 <h1 className="text-2xl font-bold leading-tight text-balance">Hello {firstName},</h1>
-                <p className="text-muted-foreground">
-                  Here&apos;s what&apos;s happening with {business.business_name}
-                </p>
+                <p className="text-muted-foreground">Here&apos;s what&apos;s happening with {business.business_name}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 self-end sm:self-auto">
@@ -216,7 +206,6 @@ export function DashboardOverview({
 
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
             <div className="space-y-6">
-              {/* Stat cards */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Card className="border-0 bg-emerald-600 text-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -224,9 +213,7 @@ export function DashboardOverview({
                     <DollarSign className="h-4 w-4 text-white/80" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">
-                      ${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </div>
+                    <div className="text-3xl font-bold">${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
                     <p className="mt-2 flex items-center gap-1 text-xs text-white/85">
                       {salesPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                       <span className="font-semibold">{Math.abs(salesPct).toFixed(1)}%</span> from last month
@@ -241,9 +228,7 @@ export function DashboardOverview({
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">{orders.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <ShoppingBag className="h-3 w-3" /> from last month
-                    </p>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><ShoppingBag className="h-3 w-3" /> from last month</p>
                   </CardContent>
                 </Card>
 
@@ -254,9 +239,7 @@ export function DashboardOverview({
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">{bookings.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <CalendarDays className="h-3 w-3" /> from last month
-                    </p>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" /> from last month</p>
                   </CardContent>
                 </Card>
 
@@ -267,54 +250,36 @@ export function DashboardOverview({
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">{pageViews.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" /> from last month
-                    </p>
+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" /> from last month</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Quick actions */}
+              <DashboardPerformanceChart orders={orders} bookings={bookings} pageViews={pageViews} />
+
               <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Button
-                      variant="outline"
-                      className="h-14 justify-start gap-2 bg-transparent text-base font-semibold"
-                      onClick={() => setAddProductOpen(true)}
-                    >
+                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" onClick={() => setAddProductOpen(true)}>
                       <Plus className="h-4 w-4" /> Products
                     </Button>
                     <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
-                      <Link href="/dashboard/promotions">
-                        <Plus className="h-4 w-4" /> Promotion
-                      </Link>
+                      <Link href="/dashboard/promotions"><Plus className="h-4 w-4" /> Promotion</Link>
                     </Button>
                     <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" asChild>
-                      <Link href={businessUrl} target="_blank">
-                        View Store <ExternalLink className="h-4 w-4" />
-                      </Link>
+                      <Link href={businessUrl} target="_blank">View Store <ExternalLink className="h-4 w-4" /></Link>
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="h-14 justify-between bg-transparent text-base font-semibold"
-                      onClick={handleCopyLink}
-                    >
+                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" onClick={handleCopyLink}>
                       {copied ? "Link copied!" : "Share Store"} <Share2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Recent activity + today's schedule */}
               <div className="grid gap-6 md:grid-cols-2">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Recent Activities</CardTitle>
-                  </CardHeader>
+                  <CardHeader><CardTitle>Recent Activities</CardTitle></CardHeader>
                   <CardContent>
                     {activities.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No activity yet — new orders and bookings will show up here.</p>
@@ -332,9 +297,7 @@ export function DashboardOverview({
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Today&apos;s Schedule</CardTitle>
-                  </CardHeader>
+                  <CardHeader><CardTitle>Today&apos;s Schedule</CardTitle></CardHeader>
                   <CardContent>
                     {todaysBookings.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No bookings scheduled for today.</p>
@@ -343,19 +306,13 @@ export function DashboardOverview({
                         {todaysBookings.map((b) => (
                           <li key={b.id} className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
-                                {b.booking_time?.slice(0, 5)}
-                              </div>
+                              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">{b.booking_time?.slice(0, 5)}</div>
                               <div>
-                                <p className="text-sm font-medium leading-tight">
-                                  {(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}
-                                </p>
+                                <p className="text-sm font-medium leading-tight">{(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}</p>
                                 <p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p>
                               </div>
                             </div>
-                            <Badge variant="secondary" className="shrink-0 capitalize">
-                              {b.status === "pending" ? "Upcoming" : b.status}
-                            </Badge>
+                            <Badge variant="secondary" className="shrink-0 capitalize">{b.status === "pending" ? "Upcoming" : b.status}</Badge>
                           </li>
                         ))}
                       </ul>
@@ -364,49 +321,35 @@ export function DashboardOverview({
                 </Card>
               </div>
 
-              {/* Catalog management */}
               <div id="inventory" className="scroll-mt-8 space-y-6">
                 <Card>
                   <CardHeader>
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-4 w-4" /> Products
-                        </CardTitle>
+                        <CardTitle className="flex items-center gap-2"><Package className="h-4 w-4" /> Products</CardTitle>
                         <CardDescription>Shown in the Products section on your public page.</CardDescription>
                       </div>
-                      <Button onClick={() => setAddProductOpen(true)} className="shrink-0">
-                        <Plus className="h-4 w-4 mr-2" /> Add
-                      </Button>
+                      <Button onClick={() => setAddProductOpen(true)} className="shrink-0"><Plus className="h-4 w-4 mr-2" /> Add</Button>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <ProductList products={products} businessId={business.id} />
-                  </CardContent>
+                  <CardContent><ProductList products={products} businessId={business.id} /></CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
                     <CardTitle>Services</CardTitle>
                     <CardDescription>
-                      Shown in the Services section on your public page. Use{" "}
-                      <span className="font-medium text-foreground">Add</span> above and choose{" "}
-                      <span className="font-medium text-foreground">Service</span>.
+                      Shown in the Services section on your public page. Use <span className="font-medium text-foreground">Add</span> above and choose <span className="font-medium text-foreground">Service</span>.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ServiceList services={services} businessId={business.id} />
-                  </CardContent>
+                  <CardContent><ServiceList services={services} businessId={business.id} /></CardContent>
                 </Card>
               </div>
             </div>
 
-            {/* Right column */}
             <div className="space-y-6">
               <Card className="border-0 bg-slate-900 text-white">
-                <CardHeader>
-                  <CardTitle className="text-white">Top Products</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-white">Top Products</CardTitle></CardHeader>
                 <CardContent>
                   {topProducts.length === 0 ? (
                     <p className="text-sm text-white/60">No sales yet — top sellers will show up here.</p>
@@ -432,19 +375,13 @@ export function DashboardOverview({
                 </CardHeader>
                 <CardContent>
                   {lowStock.length === 0 ? (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.
-                    </p>
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.</p>
                   ) : (
                     <ul className="space-y-2">
                       {lowStock.map((p: any) => (
                         <li key={p.id} className="flex items-start gap-2 text-sm">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>
-                            {p.stock_quantity === 0
-                              ? `Out of stock: ${p.name}!`
-                              : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}
-                          </span>
+                          <span>{p.stock_quantity === 0 ? `Out of stock: ${p.name}!` : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}</span>
                         </li>
                       ))}
                     </ul>
