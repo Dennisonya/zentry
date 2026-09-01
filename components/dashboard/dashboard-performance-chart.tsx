@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { format, isAfter, parseISO, subDays, startOfDay } from "date-fns"
+import { format, isSameDay, parseISO, subDays, startOfDay } from "date-fns"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
@@ -34,21 +34,15 @@ export function DashboardPerformanceChart({ orders, bookings, pageViews }: Dashb
     const days = Array.from({ length: range }, (_, index) => subDays(today, range - 1 - index))
 
     return days.map((day) => {
-      const nextDay = subDays(day, -1)
       const dayOrders = orders.filter((order) => {
         if (order.status === "cancelled") return false
-        const date = parseISO(order.created_at)
-        return !isAfter(date, nextDay) && isAfter(date, day)
+        return isSameDay(parseISO(order.created_at), day)
       })
       const dayBookings = bookings.filter((booking) => {
         if (booking.status === "cancelled") return false
-        const date = parseISO(booking.created_at)
-        return !isAfter(date, nextDay) && isAfter(date, day)
+        return isSameDay(parseISO(booking.created_at), day)
       })
-      const dayViews = pageViews.filter((view) => {
-        const date = parseISO(view.viewed_at)
-        return !isAfter(date, nextDay) && isAfter(date, day)
-      })
+      const dayViews = pageViews.filter((view) => isSameDay(parseISO(view.viewed_at), day))
 
       const sales =
         dayOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0) +
