@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles, ArrowLeft, TrendingUp, Eye, ShoppingBag, DollarSign } from "lucide-react"
 import { format, startOfDay, parseISO, startOfWeek, startOfMonth, subDays, subWeeks, subMonths } from "date-fns"
-import { Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Bar, BarChart } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 
 interface Business {
   id: string
@@ -43,10 +43,30 @@ interface AnalyticsContentProps {
 
 type RevenuePeriod = "daily" | "weekly" | "monthly"
 
+const viewsChartConfig = {
+  views: {
+    label: "Views",
+    color: "var(--chart-1)",
+  },
+} satisfies ChartConfig
+
+const revenueChartConfig = {
+  revenue: {
+    label: "Revenue",
+    color: "var(--chart-2)",
+  },
+} satisfies ChartConfig
+
+const productsChartConfig = {
+  sales: {
+    label: "Orders",
+    color: "var(--chart-3)",
+  },
+} satisfies ChartConfig
+
 export function AnalyticsContent({ business, pageViews, totalViews, products, orders }: AnalyticsContentProps) {
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("weekly")
 
-  // Page views by day (last 30 days)
   const viewsByDay = pageViews.reduce(
     (acc, view) => {
       const day = format(startOfDay(parseISO(view.viewed_at)), "MMM dd")
@@ -55,66 +75,68 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
     },
     {} as Record<string, number>,
   )
+
   const viewsChartData = Object.entries(viewsByDay).map(([date, views]) => ({ date, views }))
 
-  // Only count non-cancelled orders for revenue
   const validOrders = orders.filter((o) => o.status !== "cancelled")
   const totalRevenue = validOrders.reduce((sum, order) => sum + Number(order.total_amount), 0)
 
-  // Revenue by period
   const getRevenueChartData = () => {
     const now = new Date()
+
     if (revenuePeriod === "daily") {
-      // Last 7 days
       return Array.from({ length: 7 }, (_, i) => {
         const day = subDays(now, 6 - i)
-        const dayStr = format(day, "MMM dd")
-        const revenue = validOrders
-          .filter((o) => format(startOfDay(parseISO(o.created_at)), "MMM dd") === dayStr)
-          .reduce((s, o) => s + Number(o.total_amount), 0)
-        return { period: dayStr, revenue: Number(revenue.toFixed(2)) }
-      })
-    } else if (revenuePeriod === "weekly") {
-      // Last 8 weeks
-      return Array.from({ length: 8 }, (_, i) => {
-        const weekStart = startOfWeek(subWeeks(now, 7 - i))
-        const weekEnd = new Date(weekStart)
-        weekEnd.setDate(weekEnd.getDate() + 6)
-        const label = format(weekStart, "MMM dd")
+        const dayStart = startOfDay(day)
+        const nextDay = subDays(day, -1)
         const revenue = validOrders
           .filter((o) => {
-            const d = parseISO(o.created_at)
-            return d >= weekStart && d <= weekEnd
+            const date = parseISO(o.created_at)
+            return date >= dayStart && date < nextDay
           })
           .reduce((s, o) => s + Number(o.total_amount), 0)
-        return { period: label, revenue: Number(revenue.toFixed(2)) }
-      })
-    } else {
-      // Last 6 months
-      return Array.from({ length: 6 }, (_, i) => {
-        const monthStart = startOfMonth(subMonths(now, 5 - i))
-        const monthEnd = startOfMonth(subMonths(now, 4 - i))
-        const label = format(monthStart, "MMM yyyy")
-        const revenue = validOrders
-          .filter((o) => {
-            const d = parseISO(o.created_at)
-            return d >= monthStart && d < monthEnd
-          })
-          .reduce((s, o) => s + Number(o.total_amount), 0)
-        return { period: label, revenue: Number(revenue.toFixed(2)) }
+
+        return { period: format(day, "MMM dd"), revenue: Number(revenue.toFixed(2)) }
       })
     }
+
+    if (revenuePeriod === "weekly") {
+      return Array.from({ length: 8 }, (_, i) => {
+        const weekStart = startOfWeek(subWeeks(now, 7 - i))
+        const weekEnd = subDays(startOfWeek(subWeeks(now, 6 - i)), 0)
+        const revenue = validOrders
+          .filter((o) => {
+            const date = parseISO(o.created_at)
+            return date >= weekStart && date < weekEnd
+          })
+          .reduce((s, o) => s + Number(o.total_amount), 0)
+
+        return { period: format(weekStart, "MMM dd"), revenue: Number(revenue.toFixed(2)) }
+      })
+    }
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthStart = startOfMonth(subMonths(now, 5 - i))
+      const monthEnd = startOfMonth(subMonths(now, 4 - i))
+      const revenue = validOrders
+        .filter((o) => {
+          const date = parseISO(o.created_at)
+          return date >= monthStart && date < monthEnd
+        })
+        .reduce((s, o) => s + Number(o.total_amount), 0)
+
+      return { period: format(monthStart, "MMM yyyy"), revenue: Number(revenue.toFixed(2)) }
+    })
   }
 
   const revenueChartData = getRevenueChartData()
 
-  // Popular products
   const productSales = validOrders.reduce(
     (acc, order) => {
       if (Array.isArray(order.order_items)) {
         order.order_items.forEach((item: any) => {
           if (item.product_name) {
-            acc[item.product_name] = (acc[item.product_name] || 0) + 1
+            acc[item.product_name] = (acc[item.product_name] || 0) + (Number(item.quantity) || 1)
           }
         })
       }
@@ -122,6 +144,7 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
     },
     {} as Record<string, number>,
   )
+
   const popularProductsData = Object.entries(productSales)
     .map(([name, sales]) => ({ name, sales }))
     .sort((a, b) => b.sales - a.sales)
@@ -129,20 +152,17 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-blue-600">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Zentry
-            </span>
+            <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent">Zentry</span>
           </div>
           <Link href="/dashboard">
             <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Button>
           </Link>
@@ -151,12 +171,11 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Analytics</h1>
+          <h1 className="mb-2 text-3xl font-bold">Analytics</h1>
           <p className="text-muted-foreground">Track your business performance and customer behaviour</p>
         </div>
 
-        {/* Key Metrics */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Page Views</CardTitle>
@@ -196,61 +215,58 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {totalViews > 0 ? ((orders.length / totalViews) * 100).toFixed(1) : 0}%
-              </div>
+              <div className="text-2xl font-bold">{totalViews > 0 ? ((orders.length / totalViews) * 100).toFixed(1) : 0}%</div>
               <p className="text-xs text-muted-foreground">Orders / Views</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {/* Page views chart */}
+        <div className="mb-8 grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Page Views (Last 30 Days)</CardTitle>
+              <CardTitle>Page Views</CardTitle>
               <CardDescription>Daily visitor traffic to your business page</CardDescription>
             </CardHeader>
             <CardContent>
               {viewsChartData.length > 0 ? (
-                <ChartContainer config={{ views: { label: "Views", color: "hsl(var(--chart-1))" } }} className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={viewsChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line type="monotone" dataKey="views" stroke="var(--color-views)" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={viewsChartConfig} className="h-[300px] w-full">
+                  <AreaChart data={viewsChartData} margin={{ left: 8, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-views)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--color-views)" stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                    <Area dataKey="views" type="natural" fill="url(#fillViews)" fillOpacity={1} stroke="var(--color-views)" strokeWidth={2} />
+                  </AreaChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No page views data yet
-                </div>
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">No page views data yet</div>
               )}
             </CardContent>
           </Card>
 
-          {/* Revenue chart with period toggle */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle>Revenue</CardTitle>
-                  <CardDescription>Income over time (confirmed orders)</CardDescription>
+                  <CardDescription>Income over time from confirmed orders</CardDescription>
                 </div>
-                <div className="flex gap-1">
-                  {(["daily", "weekly", "monthly"] as RevenuePeriod[]).map((p) => (
+                <div className="flex gap-1 rounded-lg border p-1">
+                  {(["daily", "weekly", "monthly"] as RevenuePeriod[]).map((period) => (
                     <Button
-                      key={p}
+                      key={period}
                       size="sm"
-                      variant={revenuePeriod === p ? "default" : "outline"}
-                      onClick={() => setRevenuePeriod(p)}
-                      className={revenuePeriod !== p ? "bg-transparent" : ""}
+                      variant={revenuePeriod === period ? "secondary" : "ghost"}
+                      onClick={() => setRevenuePeriod(period)}
+                      className="h-8 px-3"
                     >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                      {period.charAt(0).toUpperCase() + period.slice(1)}
                     </Button>
                   ))}
                 </div>
@@ -258,54 +274,44 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
             </CardHeader>
             <CardContent>
               {revenueChartData.some((d) => d.revenue > 0) ? (
-                <ChartContainer config={{ revenue: { label: "Revenue ($)", color: "hsl(var(--chart-2))" } }} className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" fontSize={11} />
-                      <YAxis fontSize={11} tickFormatter={(v) => `$${v}`} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <ChartContainer config={revenueChartConfig} className="h-[300px] w-full">
+                  <BarChart data={revenueChartData} margin={{ left: 8, right: 8, top: 8 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(value) => `$${value}`} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dashed" />} />
+                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={6} />
+                  </BarChart>
                 </ChartContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No revenue data yet
-                </div>
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">No revenue data yet</div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Popular products */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Popular Products / Services</CardTitle>
-            <CardDescription>Top 5 most ordered items</CardDescription>
+            <CardTitle>Popular Products</CardTitle>
+            <CardDescription>Top 5 most ordered products</CardDescription>
           </CardHeader>
           <CardContent>
             {popularProductsData.length > 0 ? (
-              <ChartContainer config={{ sales: { label: "Orders", color: "hsl(var(--chart-3))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={popularProductsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="sales" fill="var(--color-sales)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <ChartContainer config={productsChartConfig} className="h-[300px] w-full">
+                <BarChart data={popularProductsData} layout="vertical" margin={{ left: 16, right: 16, top: 8, bottom: 8 }}>
+                  <CartesianGrid horizontal={false} />
+                  <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={120} tickMargin={8} />
+                  <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                  <Bar dataKey="sales" fill="var(--color-sales)" radius={6} />
+                </BarChart>
               </ChartContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No order data yet
-              </div>
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground">No order data yet</div>
             )}
           </CardContent>
         </Card>
 
-        {/* Insights */}
         <Card>
           <CardHeader>
             <CardTitle>Insights & Recommendations</CardTitle>
@@ -313,38 +319,34 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
           </CardHeader>
           <CardContent className="space-y-4">
             {totalViews === 0 && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold mb-2">Share your page to get started</h3>
+              <div className="rounded-lg bg-muted p-4">
+                <h3 className="mb-2 font-semibold">Share your page to get started</h3>
                 <p className="text-sm text-muted-foreground">
-                  Your business page hasn't received any views yet. Share your link on social media, WhatsApp, or with
-                  your customers to start tracking visitors.
+                  Your business page hasn't received any views yet. Share your link on social media, WhatsApp, or with your customers to start tracking visitors.
                 </p>
               </div>
             )}
             {totalViews > 0 && orders.length === 0 && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold mb-2">You have visitors but no orders yet</h3>
+              <div className="rounded-lg bg-muted p-4">
+                <h3 className="mb-2 font-semibold">You have visitors but no orders yet</h3>
                 <p className="text-sm text-muted-foreground">
-                  Make sure your products or services have clear descriptions and attractive images. Consider adding your
-                  WhatsApp number to make ordering easier for customers.
+                  Make sure your products or services have clear descriptions and attractive images. Consider adding your WhatsApp number to make ordering easier for customers.
                 </p>
               </div>
             )}
             {orders.length > 0 && totalViews > 0 && (orders.length / totalViews) * 100 < 5 && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold mb-2">Low conversion rate</h3>
+              <div className="rounded-lg bg-muted p-4">
+                <h3 className="mb-2 font-semibold">Low conversion rate</h3>
                 <p className="text-sm text-muted-foreground">
-                  Your conversion rate is below 5%. Try improving photos, adding detailed descriptions, or offering
-                  special promotions to encourage more orders.
+                  Your conversion rate is below 5%. Try improving photos, adding detailed descriptions, or offering special promotions to encourage more orders.
                 </p>
               </div>
             )}
             {products.length < 5 && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold mb-2">Add more products or services</h3>
+              <div className="rounded-lg bg-muted p-4">
+                <h3 className="mb-2 font-semibold">Add more products or services</h3>
                 <p className="text-sm text-muted-foreground">
-                  Having a wider selection can attract more customers and increase sales. Consider adding more items to
-                  your catalog.
+                  Having a wider selection can attract more customers and increase sales. Consider adding more items to your catalog.
                 </p>
               </div>
             )}
