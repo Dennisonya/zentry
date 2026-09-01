@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { format, isAfter, parseISO, subDays, startOfDay } from "date-fns"
-import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,6 @@ export function DashboardPerformanceChart({ orders, bookings, pageViews }: Dashb
 
   const data = useMemo(() => {
     const today = startOfDay(new Date())
-    const firstDay = subDays(today, range - 1)
     const days = Array.from({ length: range }, (_, index) => subDays(today, range - 1 - index))
 
     return days.map((day) => {
@@ -71,9 +70,7 @@ export function DashboardPerformanceChart({ orders, bookings, pageViews }: Dashb
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle>Performance overview</CardTitle>
-          <CardDescription>
-            Sales and storefront visitors over the last {range} days.
-          </CardDescription>
+          <CardDescription>Sales and storefront visitors over the last {range} days.</CardDescription>
         </div>
         <div className="flex items-center gap-1 rounded-lg border p-1">
           {[7, 30].map((value) => (
