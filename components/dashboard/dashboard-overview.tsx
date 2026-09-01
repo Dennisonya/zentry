@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { DonutChart } from "@tremor/react"
 import {
   TrendingUp,
   TrendingDown,
@@ -26,7 +27,6 @@ import { AddProductDialog } from "@/components/add-product-dialog"
 import { ProductList } from "@/components/product-list"
 import { ServiceList } from "@/components/service-list"
 import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
-import { DashboardPerformanceChart } from "@/components/dashboard/dashboard-performance-chart"
 import type { Business, Product, Service, Order, Booking as BaseBooking } from "@/components/dashboard-content"
 
 interface PageView {
@@ -47,7 +47,7 @@ interface DashboardOverviewProps {
   pageViews: PageView[]
 }
 
-const PRODUCT_COLORS = ["bg-blue-500", "bg-orange-500", "bg-lime-500", "bg-slate-400", "bg-cyan-500"]
+const PRODUCT_COLORS = ["blue", "orange", "lime", "slate", "cyan"] as const
 
 function monthOverMonth(dates: Date[], now: Date) {
   const thisMonthStart = startOfMonth(now)
@@ -120,14 +120,9 @@ export function DashboardOverview({
   ]
   const { thisSum: totalSales, pct: salesPct } = sumMonthOverMonth(salesItems, now)
 
-  const orderDates = orders.map((o) => parseISO(o.created_at))
-  const ordersPct = monthOverMonth(orderDates, now)
-
-  const bookingDates = bookings.map((b) => parseISO(b.created_at))
-  const bookingsPct = monthOverMonth(bookingDates, now)
-
-  const viewDates = pageViews.map((v) => parseISO(v.viewed_at))
-  const viewsPct = monthOverMonth(viewDates, now)
+  const ordersPct = monthOverMonth(orders.map((o) => parseISO(o.created_at)), now)
+  const bookingsPct = monthOverMonth(bookings.map((b) => parseISO(b.created_at)), now)
+  const viewsPct = monthOverMonth(pageViews.map((v) => parseISO(v.viewed_at)), now)
 
   const productSales = validOrders.reduce((acc: Record<string, number>, order) => {
     const items = Array.isArray(order.order_items) ? order.order_items : []
@@ -137,6 +132,7 @@ export function DashboardOverview({
     })
     return acc
   }, {})
+
   const topProducts = Object.entries(productSales)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
@@ -158,10 +154,7 @@ export function DashboardOverview({
     })),
     ...bookings.map((b) => ({
       id: `booking-${b.id}`,
-      label:
-        b.status === "confirmed"
-          ? `Booking confirmed for ${b.customer_name}`
-          : `New booking request from ${b.customer_name}`,
+      label: b.status === "confirmed" ? `Booking confirmed for ${b.customer_name}` : `New booking request from ${b.customer_name}`,
       sublabel: `${format(parseISO(b.booking_date), "MMM d")} at ${b.booking_time?.slice(0, 5) ?? ""}`,
       date: parseISO(b.created_at),
     })),
@@ -175,6 +168,9 @@ export function DashboardOverview({
 
   const serviceNameById = new Map(services.map((s) => [s.id, s.name]))
   const firstName = (ownerName || business.business_name).split(" ")[0]
+
+  const donutData = topProducts.map(({ name, sales }) => ({ name, sales }))
+  const totalProductSales = donutData.reduce((sum, item) => sum + item.sales, 0)
 
   return (
     <>
@@ -222,57 +218,29 @@ export function DashboardOverview({
                 </Card>
 
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
-                    <TrendBadge pct={ordersPct} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{orders.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><ShoppingBag className="h-3 w-3" /> from last month</p>
-                  </CardContent>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle><TrendBadge pct={ordersPct} /></CardHeader>
+                  <CardContent><div className="text-3xl font-bold">{orders.length}</div><p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><ShoppingBag className="h-3 w-3" /> from last month</p></CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
-                    <TrendBadge pct={bookingsPct} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{bookings.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" /> from last month</p>
-                  </CardContent>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle><TrendBadge pct={bookingsPct} /></CardHeader>
+                  <CardContent><div className="text-3xl font-bold">{bookings.length}</div><p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><CalendarDays className="h-3 w-3" /> from last month</p></CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Visitors</CardTitle>
-                    <TrendBadge pct={viewsPct} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{pageViews.length}</div>
-                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" /> from last month</p>
-                  </CardContent>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Visitors</CardTitle><TrendBadge pct={viewsPct} /></CardHeader>
+                  <CardContent><div className="text-3xl font-bold">{pageViews.length}</div><p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" /> from last month</p></CardContent>
                 </Card>
               </div>
-
-              <DashboardPerformanceChart orders={orders} bookings={bookings} pageViews={pageViews} />
 
               <Card>
                 <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" onClick={() => setAddProductOpen(true)}>
-                      <Plus className="h-4 w-4" /> Products
-                    </Button>
-                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
-                      <Link href="/dashboard/promotions"><Plus className="h-4 w-4" /> Promotion</Link>
-                    </Button>
-                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" asChild>
-                      <Link href={businessUrl} target="_blank">View Store <ExternalLink className="h-4 w-4" /></Link>
-                    </Button>
-                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" onClick={handleCopyLink}>
-                      {copied ? "Link copied!" : "Share Store"} <Share2 className="h-4 w-4" />
-                    </Button>
+                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" onClick={() => setAddProductOpen(true)}><Plus className="h-4 w-4" /> Products</Button>
+                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild><Link href="/dashboard/promotions"><Plus className="h-4 w-4" /> Promotion</Link></Button>
+                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" asChild><Link href={businessUrl} target="_blank">View Store <ExternalLink className="h-4 w-4" /></Link></Button>
+                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" onClick={handleCopyLink}>{copied ? "Link copied!" : "Share Store"} <Share2 className="h-4 w-4" /></Button>
                   </div>
                 </CardContent>
               </Card>
@@ -280,119 +248,64 @@ export function DashboardOverview({
               <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                   <CardHeader><CardTitle>Recent Activities</CardTitle></CardHeader>
-                  <CardContent>
-                    {activities.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No activity yet — new orders and bookings will show up here.</p>
-                    ) : (
-                      <ul className="space-y-4">
-                        {activities.map((a) => (
-                          <li key={a.id}>
-                            <p className="text-sm font-medium leading-tight">{a.label}</p>
-                            <p className="text-xs text-muted-foreground">{a.sublabel}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
+                  <CardContent>{activities.length === 0 ? <p className="text-sm text-muted-foreground">No activity yet — new orders and bookings will show up here.</p> : <ul className="space-y-4">{activities.map((a) => <li key={a.id}><p className="text-sm font-medium leading-tight">{a.label}</p><p className="text-xs text-muted-foreground">{a.sublabel}</p></li>)}</ul>}</CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader><CardTitle>Today&apos;s Schedule</CardTitle></CardHeader>
-                  <CardContent>
-                    {todaysBookings.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No bookings scheduled for today.</p>
-                    ) : (
-                      <ul className="space-y-4">
-                        {todaysBookings.map((b) => (
-                          <li key={b.id} className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">{b.booking_time?.slice(0, 5)}</div>
-                              <div>
-                                <p className="text-sm font-medium leading-tight">{(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}</p>
-                                <p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p>
-                              </div>
-                            </div>
-                            <Badge variant="secondary" className="shrink-0 capitalize">{b.status === "pending" ? "Upcoming" : b.status}</Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
+                  <CardContent>{todaysBookings.length === 0 ? <p className="text-sm text-muted-foreground">No bookings scheduled for today.</p> : <ul className="space-y-4">{todaysBookings.map((b) => <li key={b.id} className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">{b.booking_time?.slice(0, 5)}</div><div><p className="text-sm font-medium leading-tight">{(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}</p><p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p></div></div><Badge variant="secondary" className="shrink-0 capitalize">{b.status === "pending" ? "Upcoming" : b.status}</Badge></li>)}</ul>}</CardContent>
                 </Card>
               </div>
 
               <div id="inventory" className="scroll-mt-8 space-y-6">
                 <Card>
-                  <CardHeader>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2"><Package className="h-4 w-4" /> Products</CardTitle>
-                        <CardDescription>Shown in the Products section on your public page.</CardDescription>
-                      </div>
-                      <Button onClick={() => setAddProductOpen(true)} className="shrink-0"><Plus className="h-4 w-4 mr-2" /> Add</Button>
-                    </div>
-                  </CardHeader>
+                  <CardHeader><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2"><Package className="h-4 w-4" /> Products</CardTitle><CardDescription>Shown in the Products section on your public page.</CardDescription></div><Button onClick={() => setAddProductOpen(true)} className="shrink-0"><Plus className="h-4 w-4 mr-2" /> Add</Button></div></CardHeader>
                   <CardContent><ProductList products={products} businessId={business.id} /></CardContent>
                 </Card>
-
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Services</CardTitle>
-                    <CardDescription>
-                      Shown in the Services section on your public page. Use <span className="font-medium text-foreground">Add</span> above and choose <span className="font-medium text-foreground">Service</span>.
-                    </CardDescription>
-                  </CardHeader>
+                  <CardHeader><CardTitle>Services</CardTitle><CardDescription>Shown in the Services section on your public page. Use <span className="font-medium text-foreground">Add</span> above and choose <span className="font-medium text-foreground">Service</span>.</CardDescription></CardHeader>
                   <CardContent><ServiceList services={services} businessId={business.id} /></CardContent>
                 </Card>
               </div>
             </div>
 
             <div className="space-y-6">
-              <Card className="border-0 bg-slate-900 text-white">
-                <CardHeader><CardTitle className="text-white">Top Products</CardTitle></CardHeader>
+              <Card>
+                <CardHeader><CardTitle>Top Products</CardTitle><CardDescription>Best-selling products by units sold</CardDescription></CardHeader>
                 <CardContent>
                   {topProducts.length === 0 ? (
-                    <p className="text-sm text-white/60">No sales yet — top sellers will show up here.</p>
+                    <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">No sales yet — top sellers will show up here.</div>
                   ) : (
-                    <ul className="space-y-3">
-                      {topProducts.map((p) => (
-                        <li key={p.name} className="flex items-center gap-3">
-                          <span className={`h-3 w-3 shrink-0 rounded-sm ${p.color}`} />
-                          <span className="flex-1 text-sm text-white/90">{p.name}</span>
-                          <span className="text-xs text-white/50">{p.sales} sold</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-5">
+                      <div className="flex justify-center">
+                        <DonutChart
+                          data={donutData}
+                          category="sales"
+                          index="name"
+                          colors={["blue", "orange", "lime", "slate", "cyan"]}
+                          className="h-48 w-48"
+                          showLabel
+                          label={`${totalProductSales}`}
+                          valueFormatter={(value) => `${value} sold`}
+                          showAnimation
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        {topProducts.map((p) => <div key={p.name} className="flex items-center gap-2 text-sm"><span className={`h-2.5 w-2.5 rounded-full bg-${p.color}-500`} /><span className="min-w-0 flex-1 truncate">{p.name}</span><span className="text-xs text-muted-foreground">{p.sales} sold</span></div>)}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className={lowStock.length > 0 ? "border-0 bg-red-600 text-white" : ""}>
-                <CardHeader>
-                  <CardTitle className={lowStock.length > 0 ? "flex items-center gap-2 text-white" : "flex items-center gap-2"}>
-                    <AlertTriangle className="h-5 w-5" /> Inventory Alerts
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {lowStock.length === 0 ? (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {lowStock.map((p: any) => (
-                        <li key={p.id} className="flex items-start gap-2 text-sm">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>{p.stock_quantity === 0 ? `Out of stock: ${p.name}!` : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
+                <CardHeader><CardTitle className={lowStock.length > 0 ? "flex items-center gap-2 text-white" : "flex items-center gap-2"}><AlertTriangle className="h-5 w-5" /> Inventory Alerts</CardTitle></CardHeader>
+                <CardContent>{lowStock.length === 0 ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.</p> : <ul className="space-y-2">{lowStock.map((p: any) => <li key={p.id} className="flex items-start gap-2 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{p.stock_quantity === 0 ? `Out of stock: ${p.name}!` : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}</span></li>)}</ul>}</CardContent>
               </Card>
             </div>
           </div>
         </main>
       </div>
-
       <AddProductDialog open={addProductOpen} onOpenChange={setAddProductOpen} businessId={business.id} />
     </>
   )
