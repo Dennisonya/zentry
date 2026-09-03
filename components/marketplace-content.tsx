@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, MapPin, Phone, Instagram, MessageCircle } from "lucide-react"
+import { Search, MapPin, Phone, Instagram, MessageCircle, UserRound } from "lucide-react"
 import Link from "next/link"
+import { getSupabaseClient } from "@/lib/supabase"
 
 interface Business {
   id: string
@@ -22,86 +23,109 @@ interface Business {
   instagram_handle: string | null
 }
 
-interface MarketplaceContentProps {
-  businesses: Business[]
-}
-
-export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
+export function MarketplaceContent({ businesses }: { businesses: Business[] }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [loggedIn, setLoggedIn] = useState(false)
 
-  // Get unique categories
-  const categories = useMemo(() => {
-    const cats = new Set(businesses.map((b) => b.business_type))
-    return Array.from(cats).sort()
-  }, [businesses])
+  useEffect(() => {
+    const supabase = getSupabaseClient()
+    let mounted = true
 
-  // Filter businesses
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setLoggedIn(Boolean(data.user))
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setLoggedIn(Boolean(session?.user))
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  const categories = useMemo(
+    () => Array.from(new Set(businesses.map((b) => b.business_type))).sort(),
+    [businesses],
+  )
+
   const filteredBusinesses = useMemo(() => {
     return businesses.filter((business) => {
+      const q = searchQuery.trim().toLowerCase()
       const matchesSearch =
-        searchQuery === "" ||
-        business.business_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        business.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        business.business_type.toLowerCase().includes(searchQuery.toLowerCase())
+        !q ||
+        business.business_name.toLowerCase().includes(q) ||
+        business.description?.toLowerCase().includes(q) ||
+        business.business_type.toLowerCase().includes(q)
 
       const matchesCategory = selectedCategory === null || business.business_type === selectedCategory
-
       return matchesSearch && matchesCategory
     })
   }, [businesses, searchQuery, selectedCategory])
-  console.log("filteredBusinesses", filteredBusinesses)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-lg sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-20 border-b bg-white/80 backdrop-blur-lg">
+        <div className="container mx-auto px-4 py-5">
+          <div className="flex items-center justify-between gap-4">
             <Link
               href="/"
-              className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-2xl font-bold text-transparent"
             >
               Zentry
             </Link>
-            <nav className="flex gap-4">
-              <Link href="/auth/sign-up">
-                <Button variant="outline" className="rounded-full bg-transparent">
-                  List Your Business
+
+            <nav className="flex items-center gap-2">
+              {loggedIn ? (
+                <Button asChild variant="outline" className="rounded-full bg-white">
+                  <Link href="/account">
+                    <UserRound className="mr-2 h-4 w-4" />
+                    My Account
+                  </Link>
                 </Button>
-              </Link>
+              ) : (
+                <Button asChild variant="outline" className="rounded-full bg-white">
+                  <Link href="/auth/login?next=%2Faccount">
+                    <UserRound className="mr-2 h-4 w-4" />
+                    Sign in
+                  </Link>
+                </Button>
+              )}
+
+              <Button asChild className="rounded-full">
+                <Link href="/auth/sign-up">List Your Business</Link>
+              </Button>
             </nav>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <div className="mb-12 text-center">
+          <h1 className="mb-4 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
             Discover Local Businesses
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
             Browse through our collection of amazing local businesses and find exactly what you need
           </p>
         </div>
 
-        {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-8">
+        <div className="mx-auto mb-8 max-w-2xl">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search businesses, products, or services..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-14 rounded-full border-2 focus:border-purple-500 bg-white/80 backdrop-blur"
+              className="h-14 rounded-full border-2 bg-white/80 pl-12 backdrop-blur focus:border-purple-500"
             />
           </div>
         </div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap gap-2 justify-center mb-12">
+        <div className="mb-12 flex flex-wrap justify-center gap-2">
           <Button
             variant={selectedCategory === null ? "default" : "outline"}
             onClick={() => setSelectedCategory(null)}
@@ -121,35 +145,32 @@ export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
           ))}
         </div>
 
-        {/* Results Count */}
         <div className="mb-6">
           <p className="text-sm text-muted-foreground">
             Showing {filteredBusinesses.length} {filteredBusinesses.length === 1 ? "business" : "businesses"}
           </p>
         </div>
 
-        {/* Business Grid */}
         {filteredBusinesses.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="py-12 text-center">
             <p className="text-lg text-muted-foreground">No businesses found matching your criteria</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredBusinesses.map((business) => (
               <Link key={business.id} href={`/${business.slug}`}>
-                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur border-2 hover:border-purple-200 rounded-2xl h-full">
-                  {/* Business Header with Theme Color */}
+                <Card className="h-full overflow-hidden rounded-2xl border-2 bg-white/80 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-purple-200 hover:shadow-xl">
                   <div
-                    className="h-32 relative"
+                    className="relative h-32"
                     style={{
                       background: `linear-gradient(135deg, ${business.theme_color} 0%, ${business.theme_color}dd 100%)`,
                     }}
                   >
                     {business.logo_url && (
                       <div className="absolute -bottom-8 left-6">
-                        <div className="h-16 w-16 rounded-xl bg-white shadow-lg flex items-center justify-center overflow-hidden border-4 border-white">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border-4 border-white bg-white shadow-lg">
                           <img
-                            src={business.logo_url || "/placeholder.svg"}
+                            src={business.logo_url}
                             alt={business.business_name}
                             className="h-full w-full object-cover"
                           />
@@ -162,12 +183,12 @@ export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
                     <Badge variant="secondary" className="mb-3 rounded-full">
                       {business.business_type}
                     </Badge>
-                    <h3 className="text-xl font-bold mb-2">{business.business_name}</h3>
+                    <h3 className="mb-2 text-xl font-bold">{business.business_name}</h3>
+
                     {business.description && (
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{business.description}</p>
+                      <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">{business.description}</p>
                     )}
 
-                    {/* Contact Info */}
                     <div className="space-y-2 text-sm">
                       {business.address && (
                         <div className="flex items-center gap-2 text-muted-foreground">
@@ -183,8 +204,7 @@ export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
                       )}
                     </div>
 
-                    {/* Social Links */}
-                    <div className="flex gap-2 mt-4">
+                    <div className="mt-4 flex gap-2">
                       {business.whatsapp_number && (
                         <div className="flex items-center gap-1 text-xs text-green-600">
                           <MessageCircle className="h-3 w-3" />
@@ -206,11 +226,10 @@ export function MarketplaceContent({ businesses }: MarketplaceContentProps) {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="border-t bg-white/80 backdrop-blur mt-20">
+      <footer className="mt-20 border-t bg-white/80 backdrop-blur">
         <div className="container mx-auto px-4 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 <span className="font-semibold">Zentry</span>. Empowering local businesses.
+            © {new Date().getFullYear()} <span className="font-semibold">Zentry</span>. Empowering local businesses.
           </p>
         </div>
       </footer>

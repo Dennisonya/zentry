@@ -219,7 +219,7 @@ export default function OnboardingPage() {
           hero_image_url: heroUrl,
           dark_mode_enabled: visualData.darkModeEnabled,
           theme_color: visualData.accentColor, // Keep theme_color for backward compatibility
-          subscription_plan: intendedPlan || "basic",
+          subscription_plan: intendedPlan || "Starter",
         })
         .select()
         .single()

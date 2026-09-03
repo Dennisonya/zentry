@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { getSupabaseClient } from "@/lib/supabase"
+import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { AnalyticsContent } from "@/components/analytics-content"
 import { subDays } from "date-fns"
 
@@ -70,12 +71,17 @@ export default function AnalyticsPage() {
     return null
   }
   return (
-    <AnalyticsContent
-      business={business}
-      pageViews={pageViews}
-      totalViews={totalViews}
-      products={products}
-      orders={orders}
-    />
+    <div className="flex min-h-screen bg-muted/30">
+      <DashboardSidebar />
+      <div className="flex-1 min-w-0">
+        <AnalyticsContent
+          business={business}
+          pageViews={pageViews}
+          totalViews={totalViews}
+          products={products}
+          orders={orders}
+        />
+      </div>
+    </div>
   )
 }

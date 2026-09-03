@@ -160,7 +160,7 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
   return (
     <div className="space-y-4">
       {services.map((service) => (
-        <div key={service.id} className="flex items-center gap-4 p-4 border rounded-lg">
+        <div key={service.id} className="flex min-w-0 flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center">
           {service.image_url && (
             <div className="h-16 w-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
               <img
@@ -199,7 +199,7 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
             <p className="text-sm font-semibold mt-2">${service.price.toFixed(2)}</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
             <Button
               variant="ghost"
               size="sm"

@@ -108,9 +108,9 @@ export default function DashboardPage() {
     return null
   }
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-screen overflow-x-hidden bg-muted/30">
       <DashboardSidebar />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-x-hidden">
         <DashboardOverview
           business={business}
           ownerName={ownerName}
