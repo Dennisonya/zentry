@@ -1,12 +1,5 @@
 "use client"
 
-<<<<<<< HEAD
-import { BusinessPageWithLayout } from "./business-layouts"
-import { type LayoutStyle } from "@/lib/layouts"
-import { BlockRenderer } from "@/components/page-builder/block-renderer"
-import { isPageSchema } from "@/lib/page-builder/types"
-import { hasFeature } from "@/lib/plan-access"
-=======
 import { useEffect, useState } from "react"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
@@ -21,7 +14,6 @@ import {
 } from "@/lib/store-cart"
 import type { PageSchema } from "@/lib/page-builder/types"
 import type { Product, Service } from "@/components/business-layouts"
->>>>>>> 447dd1603412727f3d023f52cafc26f2dfa59e51
 
 export interface Business {
   id: string
@@ -52,26 +44,6 @@ interface BusinessPageProps {
 }
 
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
-<<<<<<< HEAD
-  // A Pro business with a published custom design renders through the
-  // block builder instead of a stock template. The Pro check here is
-  // defense in depth — migration 011's downgrade trigger already nulls
-  // page_schema when a business leaves Pro, but a stale client-side
-  // schema should never render even if that somehow lagged.
-  if (business.page_schema && isPageSchema(business.page_schema) && hasFeature(business, "customStoreDesign")) {
-    return (
-      <BlockRenderer schema={business.page_schema} business={business as any} products={products} services={services} />
-    )
-  }
-
-  return (
-    <BusinessPageWithLayout
-      business={business as Business}
-      products={products as Product[]}
-      services={services as Service[]}
-      layoutStyle={business.layout_style}
-    />
-=======
   const schema = business.page_schema || convertLayoutToSchema()
   const [cartOpen, setCartOpen] = useState(false)
   const [cartItems, setCartItems] = useState<StoreCartItem[]>([])
@@ -132,6 +104,5 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
         onClear={clearCart}
       />
     </>
->>>>>>> 447dd1603412727f3d023f52cafc26f2dfa59e51
   )
 }
