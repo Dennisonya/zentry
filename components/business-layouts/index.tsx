@@ -6,7 +6,7 @@ import { CompactOnepageLayout } from "./compact-onepage-layout"
 import { NeonDarkLayout } from "./neon-dark-layout"
 import { SocialCardLayout } from "./social-card-layout"
 import { BusinessCardLayout } from "./business-card-layout"
-import { EditorialStorefrontLayout } from "./editorial-storefront-layout"
+
 
 import type { LayoutStyle } from "@/lib/layouts"
 
