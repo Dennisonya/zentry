@@ -85,7 +85,7 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
   return (
     <>
       <BlockRenderer
-        schema={schema}
+        schema={schema as any}
         business={business}
         products={products}
         services={services}

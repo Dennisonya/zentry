@@ -100,7 +100,7 @@ export function AnalyticsContent({ business, pageViews, totalViews, products, or
       <div className="min-w-0">
 
         {/* Key Metrics */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Page Views</CardTitle>

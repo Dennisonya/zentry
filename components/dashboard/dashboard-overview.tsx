@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { PackagePlus, ChartLine  } from "lucide-react"
 import Link from "next/link"
 import { DonutChart } from "@tremor/react"
 import {
@@ -227,7 +228,7 @@ export function DashboardOverview({
           <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0 space-y-6">
               {/* Stat cards */}
-              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-3">
                 <StatCardLink href="/dashboard/analytics#revenue" className="border-0 bg-emerald-600 text-white shadow-sm">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-white/90">Total Sales</CardTitle>
@@ -297,7 +298,7 @@ export function DashboardOverview({
                       asChild
                     >
                       <Link href="/dashboard/inventory?new=1">
-                        <Plus className="h-4 w-4" /> Products
+                      <PackagePlus className="h-4 w-4 " /> Products
                       </Link>
                     </Button>
                     <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
