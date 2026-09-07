@@ -1,10 +1,11 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { ImagePlus, Loader2, Trash2 } from "lucide-react"
+import { ImagePlus, Loader2, Trash2, Plus, X, Search } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { blockSettingsSchemas } from "@/lib/page-builder/block-schemas"
-import type { Block, BlockType, BlockSettingsMap } from "@/lib/page-builder/types"
+import type { Block, BlockSettingsMap } from "@/lib/page-builder/types"
+import type { Product, Service } from "@/components/dashboard-content"
 import { AlignmentControl } from "./alignment-control"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,11 +17,10 @@ import { cn } from "@/lib/utils"
 interface SettingsInspectorProps {
   block: Block
   businessId: string
+  products: Product[]
+  services: Service[]
   onChange: (settings: Block["settings"]) => void
 }
-
-const textAlignClass = (value: "left" | "center" | "right") =>
-  value === "left" ? "text-left" : value === "right" ? "text-right" : "text-center"
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Label className="text-xs font-medium">{children}</Label>
@@ -64,7 +64,9 @@ function AlignmentSelect({
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as "left" | "center" | "right")}>
-      <SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
       <SelectContent>
         <SelectItem value="left">Left</SelectItem>
         <SelectItem value="center">Center</SelectItem>
@@ -75,10 +77,12 @@ function AlignmentSelect({
 }
 
 function ImageField({
+  label = "Image",
   value,
   businessId,
   onChange,
 }: {
+  label?: string
   value: string | null
   businessId: string
   onChange: (value: string | null) => void
@@ -130,7 +134,7 @@ function ImageField({
 
   return (
     <div className="space-y-2">
-      <FieldLabel>Image</FieldLabel>
+      <FieldLabel>{label}</FieldLabel>
       {value ? (
         <div className="overflow-hidden rounded-lg border">
           <img src={value} alt="" className="aspect-video w-full object-cover" />
@@ -162,6 +166,33 @@ function ImageField({
         }}
       />
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
+
+function ListField({ items, onChange, max = 4 }: { items: string[]; onChange: (items: string[]) => void; max?: number }) {
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex gap-2">
+          <Input
+            value={item}
+            onChange={(e) => {
+              const next = [...items]
+              next[i] = e.target.value
+              onChange(next)
+            }}
+          />
+          <Button type="button" size="icon" variant="ghost" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      {items.length < max && (
+        <Button type="button" size="sm" variant="outline" onClick={() => onChange([...items, ""])}>
+          <Plus className="mr-2 h-4 w-4" /> Add item
+        </Button>
+      )}
     </div>
   )
 }
@@ -199,11 +230,110 @@ function HeroInspector({
   )
 }
 
-export function SettingsInspector({ block, businessId, onChange }: SettingsInspectorProps) {
+function ItemPicker({
+  products,
+  services,
+  selectedProductIds,
+  selectedServiceIds,
+  onChange,
+  max,
+}: {
+  products: Product[]
+  services: Service[]
+  selectedProductIds: string[]
+  selectedServiceIds: string[]
+  onChange: (productIds: string[], serviceIds: string[]) => void
+  max: number
+}) {
+  const [query, setQuery] = useState("")
+  const totalSelected = selectedProductIds.length + selectedServiceIds.length
+  const q = query.trim().toLowerCase()
+
+  const filteredProducts = q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products
+  const filteredServices = q ? services.filter((s) => s.name.toLowerCase().includes(q)) : services
+
+  const toggleProduct = (id: string) => {
+    const next = selectedProductIds.includes(id) ? selectedProductIds.filter((i) => i !== id) : [...selectedProductIds, id]
+    onChange(next, selectedServiceIds)
+  }
+  const toggleService = (id: string) => {
+    const next = selectedServiceIds.includes(id) ? selectedServiceIds.filter((i) => i !== id) : [...selectedServiceIds, id]
+    onChange(selectedProductIds, next)
+  }
+
+  const atLimit = totalSelected >= max
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <FieldLabel>Choose items ({totalSelected}/{max})</FieldLabel>
+        {totalSelected > 0 && (
+          <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => onChange([], [])}>
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
+      </div>
+      <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border p-2">
+        {filteredProducts.length === 0 && filteredServices.length === 0 && (
+          <p className="p-2 text-xs text-muted-foreground">No matches.</p>
+        )}
+        {filteredProducts.map((p) => {
+          const checked = selectedProductIds.includes(p.id)
+          const disabled = !checked && atLimit
+          return (
+            <label
+              key={p.id}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60",
+                disabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleProduct(p.id)} className="shrink-0" />
+              <span className="flex-1 truncate">{p.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">${Number(p.price).toFixed(2)}</span>
+            </label>
+          )
+        })}
+        {filteredServices.map((s) => {
+          const checked = selectedServiceIds.includes(s.id)
+          const disabled = !checked && atLimit
+          return (
+            <label
+              key={s.id}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60",
+                disabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleService(s.id)} className="shrink-0" />
+              <span className="flex-1 truncate">{s.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">${Number(s.price).toFixed(2)}</span>
+            </label>
+          )
+        })}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {totalSelected === 0
+          ? "Nothing chosen — shows your most recent items by default."
+          : `Showing your ${totalSelected} chosen item${totalSelected === 1 ? "" : "s"}.`}
+      </p>
+    </div>
+  )
+}
+
+export function SettingsInspector({ block, businessId, products, services, onChange }: SettingsInspectorProps) {
   const schema = blockSettingsSchemas[block.type]
   const result = schema.safeParse(block.settings)
   if (!result.success) {
-    return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">This section has invalid settings. Reset or remove it before publishing.</div>
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        This section has invalid settings. Reset or remove it before publishing.
+      </div>
+    )
   }
 
   const update = (settings: Block["settings"]) => {
@@ -212,8 +342,88 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
   }
 
   switch (block.type) {
+    case "announcement-bar":
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <FieldLabel>Text</FieldLabel>
+            <Input value={block.settings.text} onChange={(e) => update({ ...block.settings, text: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Link (optional)</FieldLabel>
+            <Input
+              value={block.settings.link}
+              placeholder="https://... or #storefront-products"
+              onChange={(e) => update({ ...block.settings, link: e.target.value })}
+            />
+          </div>
+        </div>
+      )
+
+    case "navbar":
+      return (
+        <div className="space-y-5">
+          <ToggleField label="Show search" value={block.settings.showSearch} onChange={(showSearch) => update({ ...block.settings, showSearch })} />
+          <ToggleField label="Show cart" value={block.settings.showCart} onChange={(showCart) => update({ ...block.settings, showCart })} />
+          <p className="text-xs text-muted-foreground">
+            Nav links (Shop, Services, About, Contact) show up automatically based on what your business has —
+            nothing to configure there.
+          </p>
+        </div>
+      )
+
     case "hero":
       return <HeroInspector settings={block.settings} businessId={businessId} onChange={(value) => update(value)} />
+
+    case "popular":
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <FieldLabel>Section title</FieldLabel>
+            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+          </div>
+          <ItemPicker
+            products={products}
+            services={services}
+            selectedProductIds={block.settings.productIds}
+            selectedServiceIds={block.settings.serviceIds}
+            max={block.settings.maxItems}
+            onChange={(productIds, serviceIds) => update({ ...block.settings, productIds, serviceIds })}
+          />
+          <div className="space-y-2">
+            <FieldLabel>Max items shown</FieldLabel>
+            <Input
+              type="number"
+              min={1}
+              max={12}
+              value={block.settings.maxItems}
+              onChange={(e) => {
+                const maxItems = Math.min(12, Math.max(1, Number(e.target.value) || 1))
+                update({
+                  ...block.settings,
+                  maxItems,
+                  productIds: block.settings.productIds.slice(0, maxItems),
+                  serviceIds: block.settings.serviceIds.slice(0, maxItems),
+                })
+              }}
+            />
+          </div>
+        </div>
+      )
+
+    case "categories":
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <FieldLabel>Section title</FieldLabel>
+            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Categories are pulled automatically from your products and services — add a category to an item to have
+            it show up here.
+          </p>
+        </div>
+      )
 
     case "product-grid":
       return (
@@ -244,6 +454,55 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
         </div>
       )
 
+    case "banner":
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <FieldLabel>Heading</FieldLabel>
+            <Input value={block.settings.heading} onChange={(e) => update({ ...block.settings, heading: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Description</FieldLabel>
+            <Textarea value={block.settings.description} rows={3} onChange={(e) => update({ ...block.settings, description: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel>Button text</FieldLabel>
+              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel>Button link</FieldLabel>
+              <Input value={block.settings.ctaLink} onChange={(e) => update({ ...block.settings, ctaLink: e.target.value })} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Media type</FieldLabel>
+            <Select value={block.settings.mediaType} onValueChange={(v) => update({ ...block.settings, mediaType: v as "image" | "video" })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="video">Video (MP4)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {block.settings.mediaType === "image" ? (
+            <ImageField label="Banner image" value={block.settings.mediaUrl} businessId={businessId} onChange={(mediaUrl) => update({ ...block.settings, mediaUrl })} />
+          ) : (
+            <div className="space-y-2">
+              <FieldLabel>Video URL (.mp4)</FieldLabel>
+              <Input
+                value={block.settings.mediaUrl ?? ""}
+                placeholder="https://.../promo.mp4"
+                onChange={(e) => update({ ...block.settings, mediaUrl: e.target.value || null })}
+              />
+              <p className="text-xs text-muted-foreground">Plays muted and looped, no upload — paste a hosted MP4 link.</p>
+            </div>
+          )}
+        </div>
+      )
+
     case "about":
       return (
         <div className="space-y-5">
@@ -253,12 +512,51 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
           </div>
           <div className="space-y-2">
             <FieldLabel>Body</FieldLabel>
-            <Textarea value={block.settings.body ?? ""} rows={7} placeholder="Uses business description by default" onChange={(e) => update({ ...block.settings, body: e.target.value || null })} />
+            <Textarea value={block.settings.body ?? ""} rows={6} placeholder="Uses business description by default" onChange={(e) => update({ ...block.settings, body: e.target.value || null })} />
           </div>
+          <ImageField label="Story image" value={block.settings.imageUrl} businessId={businessId} onChange={(imageUrl) => update({ ...block.settings, imageUrl })} />
           <div className="space-y-2">
-            <FieldLabel>Alignment</FieldLabel>
-            <AlignmentSelect value={block.settings.alignment} onChange={(alignment) => update({ ...block.settings, alignment })} />
+            <FieldLabel>Image position</FieldLabel>
+            <Select value={block.settings.alignment} onValueChange={(v) => update({ ...block.settings, alignment: v as "left" | "center" | "right" })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Image on left</SelectItem>
+                <SelectItem value="right">Image on right</SelectItem>
+                <SelectItem value="center">No image, centered text</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <FieldLabel>Button text (optional)</FieldLabel>
+              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <FieldLabel>Button link</FieldLabel>
+              <Input value={block.settings.ctaLink} onChange={(e) => update({ ...block.settings, ctaLink: e.target.value })} />
+            </div>
+          </div>
+        </div>
+      )
+
+    case "trust":
+      return (
+        <div className="space-y-5">
+          <p className="text-xs text-muted-foreground">Leave empty to use sensible defaults for your business type.</p>
+          <ListField items={block.settings.items} onChange={(items) => update({ ...block.settings, items })} />
+        </div>
+      )
+
+    case "footer":
+      return (
+        <div className="space-y-5">
+          <ToggleField label="Show social links" value={block.settings.showSocials} onChange={(showSocials) => update({ ...block.settings, showSocials })} />
+          <p className="text-xs text-muted-foreground">
+            Everything else in the footer (logo, description, contact info) comes from your business profile —
+            update it in Settings.
+          </p>
         </div>
       )
 
@@ -269,13 +567,15 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
             <FieldLabel>Title</FieldLabel>
             <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
           </div>
-          {([
-            ["showPhone", "Show phone"],
-            ["showEmail", "Show email"],
-            ["showAddress", "Show address"],
-            ["showWhatsapp", "Show WhatsApp"],
-            ["showInstagram", "Show Instagram"],
-          ] as const).map(([key, label]) => (
+          {(
+            [
+              ["showPhone", "Show phone"],
+              ["showEmail", "Show email"],
+              ["showAddress", "Show address"],
+              ["showWhatsapp", "Show WhatsApp"],
+              ["showInstagram", "Show Instagram"],
+            ] as const
+          ).map(([key, label]) => (
             <ToggleField key={key} label={label} value={block.settings[key]} onChange={(value) => update({ ...block.settings, [key]: value })} />
           ))}
           <div className="space-y-2">

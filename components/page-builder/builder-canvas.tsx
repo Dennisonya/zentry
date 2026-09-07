@@ -172,7 +172,7 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
           </div>
         </aside>
 
-        <main className="relative flex flex-1 justify-center overflow-y-auto p-8">
+        <main className="relative flex flex-1 items-start justify-center overflow-y-auto p-8">
           <div className="min-h-[800px] w-full max-w-[1200px] overflow-hidden rounded-lg border bg-white shadow-sm">
             <BlockRenderer
               schema={{ schemaVersion: 1, blocks }}
@@ -180,6 +180,9 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
               products={products}
               services={services}
               showHidden
+              onAddToCart={() => {}}
+              cartItemCount={0}
+              onCartOpen={() => {}}
             />
           </div>
         </main>
@@ -200,6 +203,8 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
               <SettingsInspector
                 block={selectedBlock}
                 businessId={business.id}
+                products={products}
+                services={services}
                 onChange={(settings) => updateBlockSettings(selectedBlock.id, settings)}
               />
             ) : (

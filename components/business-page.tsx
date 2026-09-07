@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
 import { StoreCartDrawer } from "@/components/storefront/store-cart-drawer"
+import { getGoogleFontUrl } from "@/lib/storefront-fonts"
 import {
   addToStoreCart,
   readStoreCart,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/store-cart"
 import type { PageSchema } from "@/lib/page-builder/types"
 import type { Product, Service } from "@/components/business-layouts"
+import type { LayoutStyle } from "@/lib/layouts"
 
 export interface Business {
   id: string
@@ -35,6 +37,7 @@ export interface Business {
   subscription_plan?: string | null
   subscription_status?: string | null
   page_schema?: unknown
+  font_family?: string | null
 }
 
 interface BusinessPageProps {
@@ -44,7 +47,7 @@ interface BusinessPageProps {
 }
 
 export function BusinessPage({ business, products, services }: BusinessPageProps) {
-  const schema = business.page_schema || convertLayoutToSchema()
+  const schema = (business.page_schema as PageSchema | null) || convertLayoutToSchema()
   const [cartOpen, setCartOpen] = useState(false)
   const [cartItems, setCartItems] = useState<StoreCartItem[]>([])
 
@@ -61,6 +64,21 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
     window.addEventListener("zentry:cart-updated", handleCartUpdate)
     return () => window.removeEventListener("zentry:cart-updated", handleCartUpdate)
   }, [business.id])
+
+  // Loads the chosen Google Font's stylesheet once. block-renderer.tsx
+  // applies the matching CSS font-family — this just makes sure the
+  // actual font file is available for the browser to use.
+  useEffect(() => {
+    const href = getGoogleFontUrl(business.font_family)
+    if (!href) return
+    const existing = document.querySelector(`link[data-storefront-font="${business.font_family}"]`)
+    if (existing) return
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = href
+    link.setAttribute("data-storefront-font", business.font_family || "")
+    document.head.appendChild(link)
+  }, [business.font_family])
 
   const addProduct = (product: Product) => {
     addToStoreCart(business.id, product)
@@ -82,14 +100,18 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
     syncCart()
   }
 
+  const cartItemCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems])
+
   return (
     <>
       <BlockRenderer
-        schema={schema as any}
+        schema={schema}
         business={business}
         products={products}
         services={services}
         onAddToCart={addProduct}
+        cartItemCount={cartItemCount}
+        onCartOpen={() => setCartOpen(true)}
       />
 
       <StoreCartDrawer

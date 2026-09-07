@@ -17,7 +17,7 @@ const alignmentClass = {
 export function ServiceGridBlock({ services, settings, onBookService }: BlockRenderProps<"service-grid">) {
   if (services.length === 0) return null
   return (
-    <section id="services" className="scroll-mt-24 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+    <section id="storefront-services" className="scroll-mt-24 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <div className="mb-8"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Book</p><h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{settings.title}</h2></div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => (

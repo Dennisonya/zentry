@@ -27,7 +27,7 @@ export function ContactInfoBlock({ business, settings }: BlockRenderProps<"conta
   if (!hasAnyContact && !hasAnySocial) return null
 
   return (
-    <section className={`container mx-auto px-4 py-12 ${alignmentClass[settings.alignment]}`}>
+    <section id="storefront-contact-extra" className={`container mx-auto px-4 py-12 ${alignmentClass[settings.alignment]}`}>
       <h2 className="mb-8 text-3xl font-bold">{settings.title}</h2>
 
       {hasAnyContact && (

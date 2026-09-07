@@ -25,6 +25,7 @@ export interface Business {
   whatsapp_number: string | null
   instagram_handle: string | null
   hero_image_url: string | null
+  font_family?: string | null
 }
 
 export interface Product {

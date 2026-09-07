@@ -1,19 +1,45 @@
 import type { z } from "zod"
 import type {
   heroSettingsSchema,
+  announcementBarSettingsSchema,
+  navbarSettingsSchema,
+  popularSettingsSchema,
+  categoriesSettingsSchema,
   productGridSettingsSchema,
   serviceGridSettingsSchema,
+  bannerSettingsSchema,
   aboutSettingsSchema,
+  trustSettingsSchema,
+  footerSettingsSchema,
   contactInfoSettingsSchema,
 } from "@/lib/page-builder/block-schemas"
 
-export type BlockType = "hero" | "product-grid" | "service-grid" | "about" | "contact-info"
+export type BlockType =
+  | "announcement-bar"
+  | "navbar"
+  | "hero"
+  | "popular"
+  | "categories"
+  | "product-grid"
+  | "service-grid"
+  | "banner"
+  | "about"
+  | "trust"
+  | "footer"
+  | "contact-info"
 
 export type BlockSettingsMap = {
+  "announcement-bar": z.infer<typeof announcementBarSettingsSchema>
+  navbar: z.infer<typeof navbarSettingsSchema>
   hero: z.infer<typeof heroSettingsSchema>
+  popular: z.infer<typeof popularSettingsSchema>
+  categories: z.infer<typeof categoriesSettingsSchema>
   "product-grid": z.infer<typeof productGridSettingsSchema>
   "service-grid": z.infer<typeof serviceGridSettingsSchema>
+  banner: z.infer<typeof bannerSettingsSchema>
   about: z.infer<typeof aboutSettingsSchema>
+  trust: z.infer<typeof trustSettingsSchema>
+  footer: z.infer<typeof footerSettingsSchema>
   "contact-info": z.infer<typeof contactInfoSettingsSchema>
 }
 

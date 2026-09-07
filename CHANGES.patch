@@ -1,1796 +1,1854 @@
-diff --git a/app/dashboard/inventory/page.tsx b/app/dashboard/inventory/page.tsx
-new file mode 100644
-index 0000000..638f71c
---- /dev/null
-+++ b/app/dashboard/inventory/page.tsx
-@@ -0,0 +1,88 @@
-+"use client"
-+
-+import { Suspense, useCallback, useEffect, useState } from "react"
-+import { useRouter, useSearchParams } from "next/navigation"
-+import type { User } from "@supabase/supabase-js"
-+import { getSupabaseClient } from "@/lib/supabase"
-+import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
-+import { InventoryContent } from "@/components/dashboard/inventory/inventory-content"
-+import type { Business, Product } from "@/components/dashboard-content"
-+
-+function DashboardInventoryPageInner() {
-+  const router = useRouter()
-+  const searchParams = useSearchParams()
-+  const [loading, setLoading] = useState(true)
-+  const [user, setUser] = useState<User | null>(null)
-+  const [business, setBusiness] = useState<Business | null>(null)
-+  const [products, setProducts] = useState<Product[]>([])
-+
-+  const refetchProducts = useCallback(async (businessId: string) => {
-+    const supabase = getSupabaseClient()
-+    const { data } = await supabase
-+      .from("products")
-+      .select("*")
-+      .eq("business_id", businessId)
-+      .order("created_at", { ascending: false })
-+    setProducts((data as Product[]) || [])
-+  }, [])
-+
+diff --git a/components/business-layouts/index.tsx b/components/business-layouts/index.tsx
+index f542590..f01d756 100644
+--- a/components/business-layouts/index.tsx
++++ b/components/business-layouts/index.tsx
+@@ -25,6 +25,7 @@ export interface Business {
+   whatsapp_number: string | null
+   instagram_handle: string | null
+   hero_image_url: string | null
++  font_family?: string | null
+ }
+ 
+ export interface Product {
+diff --git a/components/business-page.tsx b/components/business-page.tsx
+index cee400f..a2feb8c 100644
+--- a/components/business-page.tsx
++++ b/components/business-page.tsx
+@@ -1,9 +1,10 @@
+ "use client"
+ 
+-import { useEffect, useState } from "react"
++import { useEffect, useMemo, useState } from "react"
+ import { BlockRenderer } from "@/components/page-builder/block-renderer"
+ import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
+ import { StoreCartDrawer } from "@/components/storefront/store-cart-drawer"
++import { getGoogleFontUrl } from "@/lib/storefront-fonts"
+ import {
+   addToStoreCart,
+   readStoreCart,
+@@ -14,6 +15,7 @@ import {
+ } from "@/lib/store-cart"
+ import type { PageSchema } from "@/lib/page-builder/types"
+ import type { Product, Service } from "@/components/business-layouts"
++import type { LayoutStyle } from "@/lib/layouts"
+ 
+ export interface Business {
+   id: string
+@@ -35,6 +37,7 @@ export interface Business {
+   subscription_plan?: string | null
+   subscription_status?: string | null
+   page_schema?: unknown
++  font_family?: string | null
+ }
+ 
+ interface BusinessPageProps {
+@@ -44,7 +47,7 @@ interface BusinessPageProps {
+ }
+ 
+ export function BusinessPage({ business, products, services }: BusinessPageProps) {
+-  const schema = business.page_schema || convertLayoutToSchema()
++  const schema = (business.page_schema as PageSchema | null) || convertLayoutToSchema()
+   const [cartOpen, setCartOpen] = useState(false)
+   const [cartItems, setCartItems] = useState<StoreCartItem[]>([])
+ 
+@@ -62,6 +65,21 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
+     return () => window.removeEventListener("zentry:cart-updated", handleCartUpdate)
+   }, [business.id])
+ 
++  // Loads the chosen Google Font's stylesheet once. block-renderer.tsx
++  // applies the matching CSS font-family — this just makes sure the
++  // actual font file is available for the browser to use.
 +  useEffect(() => {
-+    const fetchData = async () => {
-+      const supabase = getSupabaseClient()
-+      const {
-+        data: { user },
-+      } = await supabase.auth.getUser()
-+      if (!user) {
-+        router.replace("/auth/login")
-+        return
-+      }
-+      setUser(user)
++    const href = getGoogleFontUrl(business.font_family)
++    if (!href) return
++    const existing = document.querySelector(`link[data-storefront-font="${business.font_family}"]`)
++    if (existing) return
++    const link = document.createElement("link")
++    link.rel = "stylesheet"
++    link.href = href
++    link.setAttribute("data-storefront-font", business.font_family || "")
++    document.head.appendChild(link)
++  }, [business.font_family])
 +
-+      const { data: businessRow } = await supabase
-+        .from("businesses")
-+        .select("*")
-+        .eq("user_id", user.id)
-+        .maybeSingle()
-+
-+      if (!businessRow) {
-+        router.replace("/onboarding")
-+        return
-+      }
-+      const biz = businessRow as Business
-+      setBusiness(biz)
-+      await refetchProducts(biz.id)
-+      setLoading(false)
-+    }
-+    fetchData()
-+    // eslint-disable-next-line react-hooks/exhaustive-deps
-+  }, [])
-+
-+  if (loading) {
-+    return <div className="flex items-center justify-center min-h-screen">Loading inventory...</div>
-+  }
-+  if (!user || !business) {
-+    return null
-+  }
-+
-+  return (
-+    <div className="flex min-h-screen bg-muted/30">
-+      <DashboardSidebar />
-+      <div className="flex-1 min-w-0">
-+        <InventoryContent
-+          business={business}
-+          products={products}
-+          onProductsChange={() => refetchProducts(business.id)}
-+          autoOpenAdd={searchParams.get("new") === "1"}
-+        />
-+      </div>
-+    </div>
-+  )
-+}
-+
-+export default function DashboardInventoryPage() {
-+  return (
-+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading inventory...</div>}>
-+      <DashboardInventoryPageInner />
-+    </Suspense>
-+  )
-+}
-diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
-index c3458ad..eb89724 100644
---- a/app/dashboard/page.tsx
-+++ b/app/dashboard/page.tsx
-@@ -3,7 +3,8 @@
- import { useEffect, useState } from "react"
- import { useRouter } from "next/navigation"
- import { getSupabaseClient } from "@/lib/supabase"
--import { DashboardContent } from "@/components/dashboard-content"
-+import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
-+import { DashboardOverview } from "@/components/dashboard/dashboard-overview"
- import type { Business as DashboardBusiness } from "@/components/dashboard-content"
- import type { User } from "@supabase/supabase-js"
- 
-@@ -16,7 +17,9 @@ export default function DashboardPage() {
-   const [services, setServices] = useState<any[]>([])
-   const [orders, setOrders] = useState<any[]>([])
-   const [bookings, setBookings] = useState<any[]>([])
--  const [totalViews, setTotalViews] = useState<number>(0)
-+  const [pageViews, setPageViews] = useState<any[]>([])
-+  const [ownerName, setOwnerName] = useState<string | null>(null)
-+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
- 
-   useEffect(() => {
-     const fetchData = async () => {
-@@ -76,12 +79,21 @@ export default function DashboardPage() {
-         .order("created_at", { ascending: false })
-       setBookings(bookings || [])
- 
--      // Get analytics
--      const { count: totalViews } = await supabase
-+      // Get analytics (full rows so the dashboard can compute month-over-month trends)
-+      const { data: pageViews } = await supabase
-         .from("page_views")
--        .select("*", { count: "exact", head: true })
-+        .select("id, viewed_at")
-         .eq("business_id", biz.id)
--      setTotalViews(totalViews || 0)
-+      setPageViews(pageViews || [])
-+
-+      // Owner display info for the greeting/avatar
-+      const { data: profile } = await supabase
-+        .from("profiles")
-+        .select("full_name, avatar_url")
-+        .eq("id", user.id)
-+        .maybeSingle()
-+      setOwnerName((profile as { full_name?: string } | null)?.full_name || null)
-+      setAvatarUrl((profile as { avatar_url?: string } | null)?.avatar_url || null)
- 
-       setLoading(false)
-     }
-@@ -96,13 +108,20 @@ export default function DashboardPage() {
-     return null
+   const addProduct = (product: Product) => {
+     addToStoreCart(business.id, product)
+     syncCart()
+@@ -82,14 +100,18 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
+     syncCart()
    }
+ 
++  const cartItemCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems])
++
    return (
--    <DashboardContent
+     <>
+       <BlockRenderer
+-        schema={schema as any}
++        schema={schema}
+         business={business}
+         products={products}
+         services={services}
+         onAddToCart={addProduct}
++        cartItemCount={cartItemCount}
++        onCartOpen={() => setCartOpen(true)}
+       />
+ 
+       <StoreCartDrawer
+diff --git a/components/dashboard-content.tsx b/components/dashboard-content.tsx
+index b9e83b3..b772a08 100644
+--- a/components/dashboard-content.tsx
++++ b/components/dashboard-content.tsx
+@@ -51,6 +51,7 @@ export interface Business {
+   /** Working copy the design builder edits; not visible to customers until published. */
+   page_schema_draft?: import("@/lib/page-builder/types").PageSchema | null
+   page_schema_updated_at?: string | null
++  font_family?: string | null
+ }
+ 
+ export interface Product {
+diff --git a/components/page-builder/add-block-dialog.tsx b/components/page-builder/add-block-dialog.tsx
+index 7f5f19a..d4459d7 100644
+--- a/components/page-builder/add-block-dialog.tsx
++++ b/components/page-builder/add-block-dialog.tsx
+@@ -4,15 +4,22 @@ import { useState } from "react"
+ import { Plus } from "lucide-react"
+ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+ import { Button } from "@/components/ui/button"
+-import { blockRegistry, BLOCK_TYPES } from "@/lib/page-builder/block-registry"
++import { blockRegistry, ALL_BLOCK_TYPES } from "@/lib/page-builder/block-registry"
+ import type { BlockType } from "@/lib/page-builder/types"
+ 
+ const BLOCK_DESCRIPTIONS: Record<BlockType, string> = {
++  "announcement-bar": "A thin promo strip at the very top of your page.",
++  navbar: "Sticky header with search, favorites, and cart.",
+   hero: "Business name, logo, and description at the top of the page.",
++  popular: "A curated highlight row — your most popular products or services.",
++  categories: "Scrollable category pills, pulled from your products/services.",
+   "product-grid": "Your products, optionally grouped by category.",
+   "service-grid": "Your bookable services.",
+-  about: "A custom text section — falls back to your business description.",
+-  "contact-info": "Phone, email, address, WhatsApp, and Instagram.",
++  banner: "A large promotional banner — photo or MP4 video background.",
++  about: "Your story, with an optional side image and call-to-action button.",
++  trust: "A short row of trust signals — secure checkout, fast delivery, etc.",
++  footer: "Logo, navigation, and contact links — reused from your business profile.",
++  "contact-info": "A dedicated section with phone, email, address, WhatsApp, and Instagram.",
+ }
+ 
+ interface AddBlockDialogProps {
+@@ -34,13 +41,13 @@ export function AddBlockDialog({ onAddBlock }: AddBlockDialogProps) {
+           <Plus className="w-4 h-4" /> Add Section
+         </Button>
+       </DialogTrigger>
+-      <DialogContent className="sm:max-w-md">
++      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+         <DialogHeader>
+           <DialogTitle>Add a section</DialogTitle>
+           <DialogDescription>Choose a section type to add to your storefront page.</DialogDescription>
+         </DialogHeader>
+         <div className="grid grid-cols-1 gap-3 py-2">
+-          {BLOCK_TYPES.map((type) => {
++          {ALL_BLOCK_TYPES.map((type) => {
+             const config = blockRegistry[type]
+             const Icon = config.icon
+             return (
+diff --git a/components/page-builder/block-renderer.tsx b/components/page-builder/block-renderer.tsx
+index b2d3cda..184f9e4 100644
+--- a/components/page-builder/block-renderer.tsx
++++ b/components/page-builder/block-renderer.tsx
+@@ -3,7 +3,7 @@
+ import { useCallback, useState } from "react"
+ import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
+ import { blockRegistry } from "@/lib/page-builder/block-registry"
+-import { StorefrontChrome } from "@/components/storefront/storefront-chrome"
++import { getFontStack } from "@/lib/storefront-fonts"
+ import type { PageSchema } from "@/lib/page-builder/types"
+ import type { Business, Product, Service } from "@/components/business-layouts"
+ 
+@@ -14,52 +14,74 @@ interface BlockRendererProps {
+   services: Service[]
+   showHidden?: boolean
+   onAddToCart: (product: Product) => void
+-  onCartOpen?: () => void
++  cartItemCount: number
++  onCartOpen: () => void
+ }
+ 
+-export function BlockRenderer({ schema, business, products, services, showHidden, onAddToCart, onCartOpen }: BlockRendererProps) {
++export function BlockRenderer({
++  schema,
++  business,
++  products,
++  services,
++  showHidden,
++  onAddToCart,
++  cartItemCount,
++  onCartOpen,
++}: BlockRendererProps) {
+   const [selectedService, setSelectedService] = useState<Service | null>(null)
+   const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
+   const [search, setSearch] = useState("")
+ 
++  const handleSearchChange = useCallback((value: string) => setSearch(value), [])
++
++  // Only the catalog sections actually get filtered — a search for "wax"
++  // shouldn't also hide the hero or footer, just narrow what's browsable.
+   const filteredProducts = search.trim()
+-    ? products.filter((product) => `${product.name} ${product.description ?? ""} ${product.category ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))
++    ? products.filter((product) =>
++        `${product.name} ${product.description ?? ""} ${product.category ?? ""}`
++          .toLowerCase()
++          .includes(search.trim().toLowerCase()),
++      )
+     : products
+ 
+   const filteredServices = search.trim()
+-    ? services.filter((service) => `${service.name} ${service.description ?? ""} ${service.category ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))
++    ? services.filter((service) =>
++        `${service.name} ${service.description ?? ""} ${service.category ?? ""}`
++          .toLowerCase()
++          .includes(search.trim().toLowerCase()),
++      )
+     : services
+ 
+-  const handleSearch = useCallback((value: string) => setSearch(value), [])
+   const blocks = showHidden ? schema.blocks : schema.blocks.filter((b) => b.visible)
+ 
+   return (
+-    <StorefrontChrome
 -      business={business}
--      products={products || []}
--      services={services || []}
--      orders={orders || []}
--      bookings={bookings || []}
--      totalViews={totalViews || 0}
--    />
-+    <div className="flex min-h-screen bg-muted/30">
-+      <DashboardSidebar />
-+      <div className="flex-1 min-w-0">
-+        <DashboardOverview
-+          business={business}
-+          ownerName={ownerName}
-+          avatarUrl={avatarUrl}
-+          products={products || []}
-+          services={services || []}
-+          orders={orders || []}
-+          bookings={bookings || []}
-+          pageViews={pageViews || []}
-+        />
-+      </div>
+-      products={products}
+-      services={services}
+-      onCartOpen={onCartOpen ?? (() => {})}
+-      onSearchChange={handleSearch}
+-    >
+-      <div className="min-h-screen">
+-        {blocks.map((block) => {
+-          const def = blockRegistry[block.type]
+-          if (!def) return null
+-          const Render = def.Render as any
+-          return (
+-            <div key={block.id} className={showHidden && !block.visible ? "opacity-40" : undefined}>
+-              <Render
+-                settings={block.settings}
+-                business={business}
+-                products={block.type === "product-grid" ? filteredProducts : products}
+-                services={block.type === "service-grid" ? filteredServices : services}
+-                onAddToCart={onAddToCart}
+-                onBookService={(service: Service) => { setSelectedService(service); setServiceInquiryOpen(true) }}
+-              />
+-            </div>
+-          )
+-        })}
+-      </div>
++    // Font choice is applied once here, at the storefront root — every
++    // block's text inherits it via normal CSS cascade, so individual
++    // blocks never need to know about fonts at all.
++    <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: getFontStack(business.font_family) }}>
++      {blocks.map((block) => {
++        const def = blockRegistry[block.type]
++        if (!def) return null
++        const Render = def.Render as any
++        return (
++          <div key={block.id} className={showHidden && !block.visible ? "opacity-40" : undefined}>
++            <Render
++              settings={block.settings}
++              business={business}
++              products={block.type === "product-grid" || block.type === "popular" ? filteredProducts : products}
++              services={block.type === "service-grid" || block.type === "popular" ? filteredServices : services}
++              onAddToCart={onAddToCart}
++              onBookService={(service: Service) => {
++                setSelectedService(service)
++                setServiceInquiryOpen(true)
++              }}
++              cartItemCount={cartItemCount}
++              onCartOpen={onCartOpen}
++              onSearchChange={handleSearchChange}
++            />
++          </div>
++        )
++      })}
+ 
+       <ServiceInquiryDialog
+         open={serviceInquiryOpen}
+@@ -71,6 +93,6 @@ export function BlockRenderer({ schema, business, products, services, showHidden
+         whatsappNumber={business.whatsapp_number}
+         instagramHandle={business.instagram_handle}
+       />
+-    </StorefrontChrome>
 +    </div>
    )
  }
-diff --git a/components/business-layouts/classic-card-layout.tsx b/components/business-layouts/classic-card-layout.tsx
-index 4ac7c7e..5c0804a 100644
---- a/components/business-layouts/classic-card-layout.tsx
-+++ b/components/business-layouts/classic-card-layout.tsx
-@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
- import { Phone, Mail, MapPin, MessageCircle, Instagram, ShoppingCart, Calendar } from "lucide-react"
- import { EnhancedOrderDialog } from "@/components/enhanced-order-dialog"
- import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
-+import { groupByCategory } from "@/lib/product-categories"
+diff --git a/components/page-builder/blocks/about-block.tsx b/components/page-builder/blocks/about-block.tsx
+index 26c16ee..d4dbe6d 100644
+--- a/components/page-builder/blocks/about-block.tsx
++++ b/components/page-builder/blocks/about-block.tsx
+@@ -1,19 +1,42 @@
++import { Button } from "@/components/ui/button"
++import { ArrowRight } from "lucide-react"
+ import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
  
- export type Business = {
-   id: string
-@@ -66,6 +67,7 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
-   const [orderDialogOpen, setOrderDialogOpen] = useState(false)
-   const [serviceInquiryOpen, setServiceInquiryOpen] = useState(false)
-   const accentColor = business.accent_color || business.theme_color
-+  const productGroups = groupByCategory(products)
+-const alignmentClass = {
+-  left: "text-left",
+-  center: "text-center",
+-  right: "text-right",
+-} as const
+-
+ export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
+   const body = settings.body || business.description
++  const accentColor = business.accent_color || business.theme_color
+   if (!body) return null
  
-   const handleOrderClick = (product: Product) => {
-     setSelectedProduct(product)
-@@ -161,44 +163,53 @@ export function ClassicCardLayout({ business, products, services }: ClassicCardL
-               <p className="text-muted-foreground mb-6">No products yet — check back soon!</p>
-             </div>
-           ) : (
--            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
--              {products.map((product) => (
--                <Card
--                  key={product.id}
--                  className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
--                >
--                  {product.image_url && (
--                    <div className="aspect-square overflow-hidden bg-muted">
--                      <img
--                        src={product.image_url}
--                        alt={product.name}
--                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
--                      />
--                    </div>
-+            <div className="space-y-12">
-+              {productGroups.map((group) => (
-+                <div key={group.category}>
-+                  {productGroups.length > 1 && (
-+                    <h3 className="text-xl font-semibold mb-6 pb-2 border-b">{group.category}</h3>
-                   )}
--                  <CardContent className="p-5">
--                    <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
--                    {product.description && (
--                      <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
--                    )}
--                    <div className="flex items-center justify-between">
--                      <div className="flex items-center gap-2">
--                        {product.promotion_badge ? (
--                          <Badge className="bg-green-600 hover:bg-green-600 text-white">
--                            {product.promotion_badge}
--                          </Badge>
--                        ) : null}
--                        <span className="text-lg font-bold">${money(product.price)}</span>
--                        {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
--                          <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
--                        ) : null}
--                      </div>
--                      <Button size="sm" onClick={() => handleOrderClick(product)}>
--                        Order
--                      </Button>
--                    </div>
--                  </CardContent>
--                </Card>
-+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-+                    {group.items.map((product) => (
-+                      <Card
-+                        key={product.id}
-+                        className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
-+                      >
-+                        {product.image_url && (
-+                          <div className="aspect-square overflow-hidden bg-muted">
-+                            <img
-+                              src={product.image_url}
-+                              alt={product.name}
-+                              className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-+                            />
-+                          </div>
-+                        )}
-+                        <CardContent className="p-5">
-+                          <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-+                          {product.description && (
-+                            <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
-+                          )}
-+                          <div className="flex items-center justify-between">
-+                            <div className="flex items-center gap-2">
-+                              {product.promotion_badge ? (
-+                                <Badge className="bg-green-600 hover:bg-green-600 text-white">
-+                                  {product.promotion_badge}
-+                                </Badge>
-+                              ) : null}
-+                              <span className="text-lg font-bold">${money(product.price)}</span>
-+                              {product.original_price != null && Number(product.original_price) > Number(product.price) ? (
-+                                <span className="text-sm text-muted-foreground line-through">${money(Number(product.original_price))}</span>
-+                              ) : null}
-+                            </div>
-+                            <Button size="sm" onClick={() => handleOrderClick(product)}>
-+                              Order
-+                            </Button>
-+                          </div>
-+                        </CardContent>
-+                      </Card>
-+                    ))}
-+                  </div>
-+                </div>
-               ))}
-             </div>
-           )}
-diff --git a/components/dashboard-content.tsx b/components/dashboard-content.tsx
-index c851fde..016888f 100644
---- a/components/dashboard-content.tsx
-+++ b/components/dashboard-content.tsx
-@@ -49,6 +49,9 @@ export interface Product {
-   image_url: string | null
-   category: string | null
-   is_available: boolean
-+  stock_quantity: number | null
-+  track_inventory: boolean
-+  low_stock_threshold: number | null
++  const imageUrl = settings.imageUrl || business.hero_image_url
++  const showImage = settings.alignment !== "center" && !!imageUrl
++  const imageOnRight = settings.alignment === "right"
++
+   return (
+-    <section className={`container mx-auto max-w-3xl px-4 py-12 ${alignmentClass[settings.alignment]}`}>
+-      <h2 className="mb-6 text-3xl font-bold">{settings.title}</h2>
+-      <p className="whitespace-pre-line text-lg leading-relaxed text-muted-foreground">{body}</p>
++    <section id="storefront-about" className="container mx-auto px-4 py-14">
++      <div
++        className={`grid gap-8 overflow-hidden rounded-3xl border md:grid-cols-2 md:items-center ${
++          showImage && imageOnRight ? "md:[&>*:first-child]:order-2" : ""
++        }`}
++      >
++        {showImage ? (
++          <div className="aspect-square overflow-hidden md:aspect-auto md:h-full">
++            <img src={imageUrl!} alt="" className="h-full w-full object-cover" />
++          </div>
++        ) : null}
++
++        <div className={`p-7 sm:p-10 ${!showImage ? "mx-auto max-w-2xl text-center md:col-span-2" : ""}`}>
++          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Our Story</p>
++          <h2 className="mt-3 text-3xl font-bold sm:text-4xl">{settings.title}</h2>
++          <p className="mt-4 whitespace-pre-line text-base leading-7 text-muted-foreground">{body}</p>
++          {settings.ctaText && (
++            <Button asChild className="mt-6 text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>
++              <a href={settings.ctaLink || "#storefront-contact"}>
++                {settings.ctaText} <ArrowRight className="ml-2 h-4 w-4" />
++              </a>
++            </Button>
++          )}
++        </div>
++      </div>
+     </section>
+   )
  }
- 
- export interface Service {
-diff --git a/components/dashboard/dashboard-overview.tsx b/components/dashboard/dashboard-overview.tsx
+diff --git a/components/page-builder/blocks/announcement-bar-block.tsx b/components/page-builder/blocks/announcement-bar-block.tsx
 new file mode 100644
-index 0000000..4f191ff
+index 0000000..da6737d
 --- /dev/null
-+++ b/components/dashboard/dashboard-overview.tsx
-@@ -0,0 +1,441 @@
++++ b/components/page-builder/blocks/announcement-bar-block.tsx
+@@ -0,0 +1,18 @@
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
++
++export function AnnouncementBarBlock({ business, settings }: BlockRenderProps<"announcement-bar">) {
++  const accentColor = business.accent_color || business.theme_color
++  const content = <span className="px-4 text-center text-sm font-medium">{settings.text}</span>
++
++  return (
++    <div className="w-full py-2 text-white" style={{ backgroundColor: accentColor }}>
++      {settings.link ? (
++        <a href={settings.link} className="flex justify-center hover:underline">
++          {content}
++        </a>
++      ) : (
++        <div className="flex justify-center">{content}</div>
++      )}
++    </div>
++  )
++}
+diff --git a/components/page-builder/blocks/banner-block.tsx b/components/page-builder/blocks/banner-block.tsx
+new file mode 100644
+index 0000000..780aece
+--- /dev/null
++++ b/components/page-builder/blocks/banner-block.tsx
+@@ -0,0 +1,39 @@
++import { Button } from "@/components/ui/button"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
++
++export function BannerBlock({ business, settings }: BlockRenderProps<"banner">) {
++  const accentColor = business.accent_color || business.theme_color
++
++  return (
++    <section className="container mx-auto px-4 py-8">
++      <div className="relative min-h-[320px] overflow-hidden rounded-3xl">
++        {settings.mediaUrl ? (
++          settings.mediaType === "video" ? (
++            <video
++              src={settings.mediaUrl}
++              autoPlay
++              muted
++              loop
++              playsInline
++              className="absolute inset-0 h-full w-full object-cover"
++            />
++          ) : (
++            <img src={settings.mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
++          )
++        ) : (
++          <div className="absolute inset-0" style={{ backgroundColor: accentColor }} />
++        )}
++        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
++        <div className="relative flex min-h-[320px] max-w-xl flex-col justify-center p-8 text-white sm:p-12">
++          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{settings.heading}</h2>
++          {settings.description && <p className="mt-3 max-w-md text-white/85">{settings.description}</p>}
++          {settings.ctaText && (
++            <Button asChild size="lg" className="mt-6 w-fit bg-white text-foreground hover:bg-white/90">
++              <a href={settings.ctaLink || "#storefront-products"}>{settings.ctaText}</a>
++            </Button>
++          )}
++        </div>
++      </div>
++    </section>
++  )
++}
+diff --git a/components/page-builder/blocks/categories-block.tsx b/components/page-builder/blocks/categories-block.tsx
+new file mode 100644
+index 0000000..469572f
+--- /dev/null
++++ b/components/page-builder/blocks/categories-block.tsx
+@@ -0,0 +1,42 @@
++import { distinctCategories } from "@/lib/product-categories"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
++
++export function CategoriesBlock({ business, products, services, settings }: BlockRenderProps<"categories">) {
++  const accentColor = business.accent_color || business.theme_color
++  const categories = distinctCategories([...products, ...services])
++
++  // Gracefully disappears when there's nothing to categorize — per the
++  // brief, a business with no categories shouldn't see a broken/empty nav.
++  if (categories.length === 0) return null
++
++  const targetAnchor = products.length > 0 ? "#storefront-products" : "#storefront-services"
++
++  return (
++    <section className="container mx-auto px-4 py-6">
++      {settings.title && <h2 className="mb-4 text-lg font-semibold">{settings.title}</h2>}
++      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
++        <a
++          href={targetAnchor}
++          className="shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors hover:text-white"
++          style={{ borderColor: accentColor }}
++          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = accentColor)}
++          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
++        >
++          All
++        </a>
++        {categories.map((category) => (
++          <a
++            key={category}
++            href={targetAnchor}
++            className="shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors hover:text-white"
++            style={{ borderColor: accentColor }}
++            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = accentColor)}
++            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
++          >
++            {category}
++          </a>
++        ))}
++      </div>
++    </section>
++  )
++}
+diff --git a/components/page-builder/blocks/contact-info-block.tsx b/components/page-builder/blocks/contact-info-block.tsx
+index 0ead57c..eae01fd 100644
+--- a/components/page-builder/blocks/contact-info-block.tsx
++++ b/components/page-builder/blocks/contact-info-block.tsx
+@@ -27,7 +27,7 @@ export function ContactInfoBlock({ business, settings }: BlockRenderProps<"conta
+   if (!hasAnyContact && !hasAnySocial) return null
+ 
+   return (
+-    <section className={`container mx-auto px-4 py-12 ${alignmentClass[settings.alignment]}`}>
++    <section id="storefront-contact-extra" className={`container mx-auto px-4 py-12 ${alignmentClass[settings.alignment]}`}>
+       <h2 className="mb-8 text-3xl font-bold">{settings.title}</h2>
+ 
+       {hasAnyContact && (
+diff --git a/components/page-builder/blocks/footer-block.tsx b/components/page-builder/blocks/footer-block.tsx
+new file mode 100644
+index 0000000..fdd8272
+--- /dev/null
++++ b/components/page-builder/blocks/footer-block.tsx
+@@ -0,0 +1,87 @@
++import { Instagram, MessageCircle } from "lucide-react"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
++
++export function FooterBlock({ business, products, services, settings }: BlockRenderProps<"footer">) {
++  return (
++    <footer id="storefront-contact" className="scroll-mt-24 border-t bg-muted/30">
++      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr] lg:px-8">
++        <div>
++          <div className="flex items-center gap-3">
++            {business.logo_url && <img src={business.logo_url} alt="" className="h-9 w-9 rounded-full object-cover" />}
++            <span className="font-semibold">{business.business_name}</span>
++          </div>
++          {business.description && (
++            <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">{business.description}</p>
++          )}
++        </div>
++
++        <div>
++          <p className="text-sm font-semibold">Navigate</p>
++          <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground">
++            {products.length > 0 && (
++              <a href="#storefront-products" className="w-fit hover:text-foreground">
++                Shop
++              </a>
++            )}
++            {services.length > 0 && (
++              <a href="#storefront-services" className="w-fit hover:text-foreground">
++                Services
++              </a>
++            )}
++            {business.description && (
++              <a href="#storefront-about" className="w-fit hover:text-foreground">
++                About
++              </a>
++            )}
++          </div>
++        </div>
++
++        <div>
++          <p className="text-sm font-semibold">Connect</p>
++          <div className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground">
++            {business.email && (
++              <a href={`mailto:${business.email}`} className="hover:text-foreground">
++                {business.email}
++              </a>
++            )}
++            {business.phone && (
++              <a href={`tel:${business.phone}`} className="hover:text-foreground">
++                {business.phone}
++              </a>
++            )}
++            {business.address && <span>{business.address}</span>}
++            {settings.showSocials && (
++              <div className="flex gap-2 pt-1">
++                {business.instagram_handle && (
++                  <a
++                    href={`https://instagram.com/${business.instagram_handle.replace(/^@/, "")}`}
++                    target="_blank"
++                    rel="noreferrer"
++                    aria-label="Instagram"
++                    className="grid h-9 w-9 place-items-center rounded-full border hover:bg-background"
++                  >
++                    <Instagram className="h-4 w-4" />
++                  </a>
++                )}
++                {business.whatsapp_number && (
++                  <a
++                    href={`https://wa.me/${business.whatsapp_number.replace(/\D/g, "")}`}
++                    target="_blank"
++                    rel="noreferrer"
++                    aria-label="WhatsApp"
++                    className="grid h-9 w-9 place-items-center rounded-full border hover:bg-background"
++                  >
++                    <MessageCircle className="h-4 w-4" />
++                  </a>
++                )}
++              </div>
++            )}
++          </div>
++        </div>
++      </div>
++      <div className="border-t py-5 text-center text-xs text-muted-foreground">
++        © {new Date().getFullYear()} {business.business_name}. Powered by Zentry.
++      </div>
++    </footer>
++  )
++}
+diff --git a/components/page-builder/blocks/navbar-block.tsx b/components/page-builder/blocks/navbar-block.tsx
+new file mode 100644
+index 0000000..23c2650
+--- /dev/null
++++ b/components/page-builder/blocks/navbar-block.tsx
+@@ -0,0 +1,143 @@
 +"use client"
 +
-+import { useMemo, useState } from "react"
++import { useEffect, useState } from "react"
 +import Link from "next/link"
-+import {
-+  TrendingUp,
-+  TrendingDown,
-+  ShoppingBag,
-+  CalendarDays,
-+  Users,
-+  DollarSign,
-+  Plus,
-+  ExternalLink,
-+  Share2,
-+  AlertTriangle,
-+  CheckCircle2,
-+} from "lucide-react"
-+import { format, isSameDay, parseISO, startOfMonth, subMonths } from "date-fns"
-+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-+import { Badge } from "@/components/ui/badge"
++import { Search, Heart, ShoppingBag, Menu, X } from "lucide-react"
 +import { Button } from "@/components/ui/button"
-+import { ThemeToggle } from "@/components/theme-toggle"
-+import { ServiceList } from "@/components/service-list"
-+import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
-+import type { Business, Product, Service, Order, Booking as BaseBooking } from "@/components/dashboard-content"
++import { Input } from "@/components/ui/input"
++import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 +
-+interface PageView {
-+  id: string
-+  viewed_at: string
++interface NavLink {
++  label: string
++  href: string
 +}
 +
-+// The bookings table has a service_id column that the shared Booking type
-+// (used by the legacy dashboard view) doesn't declare. Extend it locally.
-+type Booking = BaseBooking & { service_id?: string | null }
-+
-+interface DashboardOverviewProps {
-+  business: Business
-+  ownerName: string | null
-+  avatarUrl: string | null
-+  products: Product[]
-+  services: Service[]
-+  orders: Order[]
-+  bookings: Booking[]
-+  pageViews: PageView[]
-+}
-+
-+const PRODUCT_COLORS = ["bg-blue-500", "bg-orange-500", "bg-lime-500", "bg-slate-400", "bg-cyan-500"]
-+
-+function monthOverMonth(dates: Date[], now: Date) {
-+  const thisMonthStart = startOfMonth(now)
-+  const lastMonthStart = startOfMonth(subMonths(now, 1))
-+  const thisCount = dates.filter((d) => d >= thisMonthStart).length
-+  const lastCount = dates.filter((d) => d >= lastMonthStart && d < thisMonthStart).length
-+  if (lastCount === 0) return thisCount > 0 ? 100 : 0
-+  return ((thisCount - lastCount) / lastCount) * 100
-+}
-+
-+function sumMonthOverMonth(items: { date: Date; amount: number }[], now: Date) {
-+  const thisMonthStart = startOfMonth(now)
-+  const lastMonthStart = startOfMonth(subMonths(now, 1))
-+  const thisSum = items.filter((i) => i.date >= thisMonthStart).reduce((s, i) => s + i.amount, 0)
-+  const lastSum = items
-+    .filter((i) => i.date >= lastMonthStart && i.date < thisMonthStart)
-+    .reduce((s, i) => s + i.amount, 0)
-+  const pct = lastSum === 0 ? (thisSum > 0 ? 100 : 0) : ((thisSum - lastSum) / lastSum) * 100
-+  return { thisSum, pct }
-+}
-+
-+function TrendBadge({ pct }: { pct: number }) {
-+  const positive = pct >= 0
-+  return (
-+    <Badge
-+      className={
-+        positive
-+          ? "border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400"
-+          : "border-transparent bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-500/15 dark:text-red-400"
-+      }
-+    >
-+      {positive ? "+" : ""}
-+      {pct.toFixed(1)}%
-+    </Badge>
-+  )
-+}
-+
-+export function DashboardOverview({
++export function NavbarBlock({
 +  business,
-+  ownerName,
-+  avatarUrl,
 +  products,
 +  services,
-+  orders,
-+  bookings,
-+  pageViews,
-+}: DashboardOverviewProps) {
-+  const [copied, setCopied] = useState(false)
-+  const now = useMemo(() => new Date(), [])
++  settings,
++  cartItemCount,
++  onCartOpen,
++  onSearchChange,
++}: BlockRenderProps<"navbar">) {
++  const [scrolled, setScrolled] = useState(false)
++  const [mobileOpen, setMobileOpen] = useState(false)
++  const [searchOpen, setSearchOpen] = useState(false)
++  const [query, setQuery] = useState("")
++  const accentColor = business.accent_color || business.theme_color
 +
-+  const businessUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${business.slug}`
++  useEffect(() => {
++    const onScroll = () => setScrolled(window.scrollY > 8)
++    onScroll()
++    window.addEventListener("scroll", onScroll, { passive: true })
++    return () => window.removeEventListener("scroll", onScroll)
++  }, [])
 +
-+  const handleCopyLink = async () => {
-+    try {
-+      await navigator.share?.({ title: business.business_name, url: businessUrl })
-+    } catch {
-+      await navigator.clipboard.writeText(businessUrl)
-+      setCopied(true)
-+      setTimeout(() => setCopied(false), 2000)
-+    }
-+  }
++  useEffect(() => {
++    onSearchChange(query)
++  }, [query, onSearchChange])
 +
-+  // ---- Stats ----
-+  const validOrders = orders.filter((o) => o.status !== "cancelled")
-+  const validBookings = bookings.filter((b) => b.status !== "cancelled")
++  const hasContactInfo = !!(business.phone || business.email || business.address || business.whatsapp_number)
 +
-+  const salesItems = [
-+    ...validOrders.map((o) => ({ date: parseISO(o.created_at), amount: Number(o.total_amount) })),
-+    ...validBookings.map((b) => ({ date: parseISO(b.created_at), amount: Number(b.total_amount) })),
-+  ]
-+  const { thisSum: totalSales, pct: salesPct } = sumMonthOverMonth(salesItems, now)
-+
-+  const orderDates = orders.map((o) => parseISO(o.created_at))
-+  const ordersPct = monthOverMonth(orderDates, now)
-+
-+  const bookingDates = bookings.map((b) => parseISO(b.created_at))
-+  const bookingsPct = monthOverMonth(bookingDates, now)
-+
-+  const viewDates = pageViews.map((v) => parseISO(v.viewed_at))
-+  const viewsPct = monthOverMonth(viewDates, now)
-+
-+  // ---- Top products (by units sold from order_items) ----
-+  const productSales = validOrders.reduce((acc: Record<string, number>, order) => {
-+    const items = Array.isArray(order.order_items) ? order.order_items : []
-+    items.forEach((item: any) => {
-+      const name = item.product_name || item.name
-+      if (name) acc[name] = (acc[name] || 0) + (Number(item.quantity) || 1)
-+    })
-+    return acc
-+  }, {})
-+  const topProducts = Object.entries(productSales)
-+    .sort((a, b) => b[1] - a[1])
-+    .slice(0, 5)
-+    .map(([name, sales], i) => ({ name, sales, color: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }))
-+
-+  // ---- Inventory alerts ----
-+  const lowStock = products
-+    .filter((p) => p.track_inventory && p.stock_quantity !== null && p.stock_quantity !== undefined)
-+    .filter((p) => (p.stock_quantity as number) <= (p.low_stock_threshold ?? 5))
-+    .sort((a, b) => (a.stock_quantity as number) - (b.stock_quantity as number))
-+    .slice(0, 5)
-+
-+  // ---- Recent activity ----
-+  type Activity = { id: string; label: string; sublabel: string; date: Date }
-+  const activities: Activity[] = [
-+    ...orders.map((o) => ({
-+      id: `order-${o.id}`,
-+      label: `New order from ${o.customer_name}`,
-+      sublabel: `$${Number(o.total_amount).toFixed(2)} · ${o.status}`,
-+      date: parseISO(o.created_at),
-+    })),
-+    ...bookings.map((b) => ({
-+      id: `booking-${b.id}`,
-+      label:
-+        b.status === "confirmed"
-+          ? `Booking confirmed for ${b.customer_name}`
-+          : `New booking request from ${b.customer_name}`,
-+      sublabel: `${format(parseISO(b.booking_date), "MMM d")} at ${b.booking_time?.slice(0, 5) ?? ""}`,
-+      date: parseISO(b.created_at),
-+    })),
-+  ]
-+    .sort((a, b) => b.date.getTime() - a.date.getTime())
-+    .slice(0, 5)
-+
-+  // ---- Today's schedule ----
-+  const todaysBookings = bookings
-+    .filter((b) => b.status !== "cancelled" && isSameDay(parseISO(b.booking_date), now))
-+    .sort((a, b) => (a.booking_time > b.booking_time ? 1 : -1))
-+
-+  const serviceNameById = new Map(services.map((s) => [s.id, s.name]))
-+
-+  const firstName = (ownerName || business.business_name).split(" ")[0]
++  const links: NavLink[] = [
++    products.length > 0 ? { label: "Shop", href: "#storefront-products" } : null,
++    services.length > 0 ? { label: "Services", href: "#storefront-services" } : null,
++    business.description ? { label: "About", href: "#storefront-about" } : null,
++    hasContactInfo ? { label: "Contact", href: "#storefront-contact" } : null,
++  ].filter((l): l is NavLink => l !== null)
 +
 +  return (
-+    <>
-+      <div className="mx-auto max-w-[1600px]">
-+        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-+          {/* Header */}
-+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-+            <div className="flex items-center gap-3">
-+              <MobileDashboardNav />
-+              <div>
-+                <h1 className="text-2xl font-bold leading-tight text-balance">Hello {firstName},</h1>
-+                <p className="text-muted-foreground">
-+                  Here&apos;s what&apos;s happening with {business.business_name}
-+                </p>
-+              </div>
-+            </div>
-+            <div className="flex items-center gap-3 self-end sm:self-auto">
-+              <span className="hidden text-sm text-muted-foreground md:inline">{format(now, "EEEE, MMMM do yyyy")}</span>
-+              <ThemeToggle />
-+              <div className="flex items-center gap-2">
-+                <Avatar>
-+                  <AvatarImage src={avatarUrl ?? undefined} alt={ownerName ?? business.business_name} />
-+                  <AvatarFallback>{firstName.slice(0, 2).toUpperCase()}</AvatarFallback>
-+                </Avatar>
-+                <div className="hidden sm:block">
-+                  <p className="text-sm font-semibold leading-none">{ownerName || business.business_name}</p>
-+                  <p className="text-xs text-muted-foreground">Business owner</p>
++    <header
++      className={`sticky top-0 z-40 w-full border-b transition-colors ${
++        scrolled ? "border-border bg-background/95 shadow-sm backdrop-blur-sm" : "border-transparent bg-background"
++      }`}
++    >
++      <div className="container mx-auto flex h-16 items-center gap-4 px-4">
++        <button className="shrink-0 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
++          <Menu className="h-5 w-5" />
++        </button>
++
++        <a href="#" className="flex shrink-0 items-center gap-2 font-bold">
++          {business.logo_url ? (
++            <img src={business.logo_url} alt={business.business_name} className="h-9 w-9 rounded-lg object-cover" />
++          ) : null}
++          <span className="truncate">{business.business_name}</span>
++        </a>
++
++        <nav className="hidden flex-1 items-center justify-center gap-6 lg:flex">
++          {links.map((link) => (
++            <a key={link.href} href={link.href} className="text-sm font-medium text-foreground/70 hover:text-foreground">
++              {link.label}
++            </a>
++          ))}
++        </nav>
++
++        <div className="ml-auto flex shrink-0 items-center gap-1">
++          {settings.showSearch && (
++            <div className="relative">
++              <Button variant="ghost" size="icon" onClick={() => setSearchOpen((v) => !v)} aria-label="Search">
++                <Search className="h-[18px] w-[18px]" />
++              </Button>
++              {searchOpen && (
++                <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border bg-background p-3 shadow-lg">
++                  <Input
++                    autoFocus
++                    placeholder="Search products & services..."
++                    value={query}
++                    onChange={(e) => setQuery(e.target.value)}
++                  />
++                  <p className="mt-1.5 text-xs text-muted-foreground">Filters the sections below as you type.</p>
 +                </div>
-+              </div>
++              )}
 +            </div>
-+          </div>
++          )}
 +
-+          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-+            <div className="space-y-6">
-+              {/* Stat cards */}
-+              <div className="grid gap-4 sm:grid-cols-2">
-+                <Card className="border-0 bg-emerald-600 text-white shadow-sm">
-+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-+                    <CardTitle className="text-sm font-medium text-white/90">Total Sales</CardTitle>
-+                    <DollarSign className="h-4 w-4 text-white/80" />
-+                  </CardHeader>
-+                  <CardContent>
-+                    <div className="text-3xl font-bold">
-+                      ${totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-+                    </div>
-+                    <p className="mt-2 flex items-center gap-1 text-xs text-white/85">
-+                      {salesPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-+                      <span className="font-semibold">{Math.abs(salesPct).toFixed(1)}%</span> from last month
-+                    </p>
-+                  </CardContent>
-+                </Card>
++          <Button variant="ghost" size="icon" asChild aria-label="Favorites">
++            <Link href="/account/favorites">
++              <Heart className="h-[18px] w-[18px]" />
++            </Link>
++          </Button>
 +
-+                <Card>
-+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
-+                    <TrendBadge pct={ordersPct} />
-+                  </CardHeader>
-+                  <CardContent>
-+                    <div className="text-3xl font-bold">{orders.length}</div>
-+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-+                      <ShoppingBag className="h-3 w-3" /> from last month
-+                    </p>
-+                  </CardContent>
-+                </Card>
-+
-+                <Card>
-+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
-+                    <TrendBadge pct={bookingsPct} />
-+                  </CardHeader>
-+                  <CardContent>
-+                    <div className="text-3xl font-bold">{bookings.length}</div>
-+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-+                      <CalendarDays className="h-3 w-3" /> from last month
-+                    </p>
-+                  </CardContent>
-+                </Card>
-+
-+                <Card>
-+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Visitors</CardTitle>
-+                    <TrendBadge pct={viewsPct} />
-+                  </CardHeader>
-+                  <CardContent>
-+                    <div className="text-3xl font-bold">{pageViews.length}</div>
-+                    <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-+                      <Users className="h-3 w-3" /> from last month
-+                    </p>
-+                  </CardContent>
-+                </Card>
-+              </div>
-+
-+              {/* Quick actions */}
-+              <Card>
-+                <CardHeader>
-+                  <CardTitle>Quick Actions</CardTitle>
-+                </CardHeader>
-+                <CardContent>
-+                  <div className="grid gap-3 sm:grid-cols-2">
-+                    <Button
-+                      variant="outline"
-+                      className="h-14 justify-start gap-2 bg-transparent text-base font-semibold"
-+                      asChild
-+                    >
-+                      <Link href="/dashboard/inventory?new=1">
-+                        <Plus className="h-4 w-4" /> Products
-+                      </Link>
-+                    </Button>
-+                    <Button variant="outline" className="h-14 justify-start gap-2 bg-transparent text-base font-semibold" asChild>
-+                      <Link href="/dashboard/promotions">
-+                        <Plus className="h-4 w-4" /> Promotion
-+                      </Link>
-+                    </Button>
-+                    <Button variant="outline" className="h-14 justify-between bg-transparent text-base font-semibold" asChild>
-+                      <Link href={businessUrl} target="_blank">
-+                        View Store <ExternalLink className="h-4 w-4" />
-+                      </Link>
-+                    </Button>
-+                    <Button
-+                      variant="outline"
-+                      className="h-14 justify-between bg-transparent text-base font-semibold"
-+                      onClick={handleCopyLink}
-+                    >
-+                      {copied ? "Link copied!" : "Share Store"} <Share2 className="h-4 w-4" />
-+                    </Button>
-+                  </div>
-+                </CardContent>
-+              </Card>
-+
-+              {/* Recent activity + today's schedule */}
-+              <div className="grid gap-6 md:grid-cols-2">
-+                <Card>
-+                  <CardHeader>
-+                    <CardTitle>Recent Activities</CardTitle>
-+                  </CardHeader>
-+                  <CardContent>
-+                    {activities.length === 0 ? (
-+                      <p className="text-sm text-muted-foreground">No activity yet — new orders and bookings will show up here.</p>
-+                    ) : (
-+                      <ul className="space-y-4">
-+                        {activities.map((a) => (
-+                          <li key={a.id}>
-+                            <p className="text-sm font-medium leading-tight">{a.label}</p>
-+                            <p className="text-xs text-muted-foreground">{a.sublabel}</p>
-+                          </li>
-+                        ))}
-+                      </ul>
-+                    )}
-+                  </CardContent>
-+                </Card>
-+
-+                <Card>
-+                  <CardHeader>
-+                    <CardTitle>Today&apos;s Schedule</CardTitle>
-+                  </CardHeader>
-+                  <CardContent>
-+                    {todaysBookings.length === 0 ? (
-+                      <p className="text-sm text-muted-foreground">No bookings scheduled for today.</p>
-+                    ) : (
-+                      <ul className="space-y-4">
-+                        {todaysBookings.map((b) => (
-+                          <li key={b.id} className="flex items-center justify-between gap-3">
-+                            <div className="flex items-center gap-3">
-+                              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
-+                                {b.booking_time?.slice(0, 5)}
-+                              </div>
-+                              <div>
-+                                <p className="text-sm font-medium leading-tight">
-+                                  {(b.service_id && serviceNameById.get(b.service_id)) || "Booking"}
-+                                </p>
-+                                <p className="text-xs text-muted-foreground">Customer: {b.customer_name}</p>
-+                              </div>
-+                            </div>
-+                            <Badge variant="secondary" className="shrink-0 capitalize">
-+                              {b.status === "pending" ? "Upcoming" : b.status}
-+                            </Badge>
-+                          </li>
-+                        ))}
-+                      </ul>
-+                    )}
-+                  </CardContent>
-+                </Card>
-+              </div>
-+
-+              {/* Catalog management — products now live on the dedicated Inventory page */}
-+              <div className="space-y-6">
-+                <Card>
-+                  <CardHeader>
-+                    <CardTitle>Services</CardTitle>
-+                    <CardDescription>
-+                      Shown in the Services section on your public page. Manage product stock and pricing from{" "}
-+                      <Link href="/dashboard/inventory" className="text-primary underline-offset-4 hover:underline">
-+                        Inventory
-+                      </Link>
-+                      .
-+                    </CardDescription>
-+                  </CardHeader>
-+                  <CardContent>
-+                    <ServiceList services={services} businessId={business.id} />
-+                  </CardContent>
-+                </Card>
-+              </div>
-+            </div>
-+
-+            {/* Right column */}
-+            <div className="space-y-6">
-+              <Card className="border-0 bg-slate-900 text-white">
-+                <CardHeader>
-+                  <CardTitle className="text-white">Top Products</CardTitle>
-+                </CardHeader>
-+                <CardContent>
-+                  {topProducts.length === 0 ? (
-+                    <p className="text-sm text-white/60">No sales yet — top sellers will show up here.</p>
-+                  ) : (
-+                    <ul className="space-y-3">
-+                      {topProducts.map((p) => (
-+                        <li key={p.name} className="flex items-center gap-3">
-+                          <span className={`h-3 w-3 shrink-0 rounded-sm ${p.color}`} />
-+                          <span className="flex-1 text-sm text-white/90">{p.name}</span>
-+                          <span className="text-xs text-white/50">{p.sales} sold</span>
-+                        </li>
-+                      ))}
-+                    </ul>
-+                  )}
-+                </CardContent>
-+              </Card>
-+
-+              <Card className={lowStock.length > 0 ? "border-0 bg-red-600 text-white" : ""}>
-+                <CardHeader>
-+                  <CardTitle className={lowStock.length > 0 ? "flex items-center gap-2 text-white" : "flex items-center gap-2"}>
-+                    <AlertTriangle className="h-5 w-5" /> Inventory Alerts
-+                  </CardTitle>
-+                </CardHeader>
-+                <CardContent>
-+                  {lowStock.length === 0 ? (
-+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-+                      <CheckCircle2 className="h-4 w-4" /> Stock levels look healthy.
-+                    </p>
-+                  ) : (
-+                    <ul className="space-y-2">
-+                      {lowStock.map((p) => (
-+                        <li key={p.id} className="flex items-start gap-2 text-sm">
-+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-+                          <span>
-+                            {p.stock_quantity === 0
-+                              ? `Out of stock: ${p.name}!`
-+                              : `${p.stock_quantity} stock${p.stock_quantity === 1 ? "" : "s"} of ${p.name} left!`}
-+                          </span>
-+                        </li>
-+                      ))}
-+                    </ul>
-+                  )}
-+                </CardContent>
-+              </Card>
-+            </div>
-+          </div>
-+        </main>
++          {settings.showCart && (
++            <Button variant="ghost" size="icon" className="relative" onClick={onCartOpen} aria-label="Cart">
++              <ShoppingBag className="h-[18px] w-[18px]" />
++              {cartItemCount > 0 && (
++                <span
++                  className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
++                  style={{ backgroundColor: accentColor }}
++                >
++                  {cartItemCount > 9 ? "9+" : cartItemCount}
++                </span>
++              )}
++            </Button>
++          )}
++        </div>
 +      </div>
-+    </>
++
++      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
++        <SheetContent side="left" className="w-72">
++          <SheetTitle className="flex items-center justify-between">
++            {business.business_name}
++            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
++              <X className="h-4 w-4" />
++            </Button>
++          </SheetTitle>
++          <nav className="mt-6 flex flex-col gap-1">
++            {links.map((link) => (
++              <a
++                key={link.href}
++                href={link.href}
++                onClick={() => setMobileOpen(false)}
++                className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted"
++              >
++                {link.label}
++              </a>
++            ))}
++          </nav>
++        </SheetContent>
++      </Sheet>
++    </header>
 +  )
 +}
-diff --git a/components/dashboard/dashboard-sidebar.tsx b/components/dashboard/dashboard-sidebar.tsx
+diff --git a/components/page-builder/blocks/popular-block.tsx b/components/page-builder/blocks/popular-block.tsx
 new file mode 100644
-index 0000000..60efce6
+index 0000000..17c1416
 --- /dev/null
-+++ b/components/dashboard/dashboard-sidebar.tsx
-@@ -0,0 +1,213 @@
++++ b/components/page-builder/blocks/popular-block.tsx
+@@ -0,0 +1,92 @@
 +"use client"
 +
 +import { useState } from "react"
 +import Link from "next/link"
-+import { usePathname, useRouter } from "next/navigation"
-+import {
-+  LayoutGrid,
-+  BarChart3,
-+  Package,
-+  ShoppingBag,
-+  Gift,
-+  Settings,
-+  HelpCircle,
-+  LogOut,
-+  ChevronDown,
-+  Sparkles,
-+  Menu,
-+} from "lucide-react"
-+import { cn } from "@/lib/utils"
-+import { getSupabaseClient } from "@/lib/supabase"
-+import {
-+  DropdownMenu,
-+  DropdownMenuContent,
-+  DropdownMenuItem,
-+  DropdownMenuTrigger,
-+} from "@/components/ui/dropdown-menu"
-+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 +import { Button } from "@/components/ui/button"
++import { Card, CardContent } from "@/components/ui/card"
++import { ShoppingCart, Check, CalendarDays, TrendingUp } from "lucide-react"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
++import type { Product, Service } from "@/components/business-layouts"
 +
-+function NavLink({
-+  href,
-+  icon: Icon,
-+  label,
-+  active,
-+}: {
-+  href: string
-+  icon: React.ElementType
-+  label: string
-+  active: boolean
-+}) {
-+  return (
-+    <Link
-+      href={href}
-+      className={cn(
-+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-+        active ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white",
-+      )}
-+    >
-+      <Icon className="h-[18px] w-[18px] shrink-0" />
-+      <span>{label}</span>
-+    </Link>
-+  )
++function money(n: number) {
++  const x = Number(n)
++  return Number.isFinite(x) ? x.toFixed(2) : "0.00"
 +}
 +
-+function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
-+  const pathname = usePathname()
-+  const router = useRouter()
-+  const [ordersOpen, setOrdersOpen] = useState(false)
++type Entry = ({ kind: "product" } & Product) | ({ kind: "service" } & Service)
 +
-+  const isOrdersSection = pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bookings")
++export function PopularBlock({ business, products, services, settings, onAddToCart, onBookService }: BlockRenderProps<"popular">) {
++  const [addedId, setAddedId] = useState<string | null>(null)
++  const accentColor = business.accent_color || business.theme_color
 +
-+  const handleSignOut = async () => {
-+    const supabase = getSupabaseClient()
-+    await supabase.auth.signOut()
-+    router.push("/")
-+  }
++  // Curated pick when the business chose specific items; otherwise fall
++  // back to the first N as already ordered — useful with zero setup.
++  const chosenProducts = settings.productIds.length
++    ? settings.productIds.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => !!p)
++    : products.slice(0, settings.maxItems)
++  const chosenServices = settings.serviceIds.length
++    ? settings.serviceIds.map((id) => services.find((s) => s.id === id)).filter((s): s is Service => !!s)
++    : business.business_type_mode === "services"
++      ? services.slice(0, settings.maxItems)
++      : []
++
++  const entries: Entry[] = [
++    ...chosenProducts.map((p) => ({ kind: "product" as const, ...p })),
++    ...chosenServices.map((s) => ({ kind: "service" as const, ...s })),
++  ].slice(0, settings.maxItems)
++
++  if (entries.length === 0) return null
++
++  const viewAllHref = entries.some((e) => e.kind === "product") ? "#storefront-products" : "#storefront-services"
 +
 +  return (
-+    <div className="flex h-full flex-col">
-+      {/* Logo */}
-+      <div className="flex items-center gap-2 px-2 pb-6">
-+        <div className="h-8 w-8 rounded-lg bg-white/15 flex items-center justify-center">
-+          <Sparkles className="h-4 w-4 text-white" />
-+        </div>
-+        <span className="text-xl font-bold text-white tracking-tight">Zentry</span>
++    <section className="container mx-auto px-4 py-12">
++      <div className="mb-8 flex items-center justify-between gap-4">
++        <h2 className="flex items-center gap-2 text-3xl font-bold">
++          <TrendingUp className="h-6 w-6" style={{ color: accentColor }} /> {settings.title}
++        </h2>
++        <Link href={viewAllHref} className="shrink-0 text-sm font-medium hover:underline" style={{ color: accentColor }}>
++          View all
++        </Link>
 +      </div>
-+      <div className="h-px bg-white/15 mb-6" />
 +
-+      <nav className="flex-1 space-y-6 overflow-y-auto">
-+        <div>
-+          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-white/50">General</p>
-+          <div className="space-y-1">
-+            <NavLink href="/dashboard" icon={LayoutGrid} label="Dashboard" active={pathname === "/dashboard"} />
-+            <NavLink
-+              href="/dashboard/analytics"
-+              icon={BarChart3}
-+              label="Analytics"
-+              active={pathname === "/dashboard/analytics"}
-+            />
-+            <NavLink
-+              href={inventoryHref}
-+              icon={Package}
-+              label="Inventory"
-+              active={pathname?.startsWith("/dashboard/inventory") ?? false}
-+            />
-+
-+            {/* Orders / Bookings — expandable */}
-+            <div>
-+              <button
-+                onClick={() => setOrdersOpen((o) => !o)}
-+                className={cn(
-+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-+                  isOrdersSection ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white",
++      <div className="grid snap-x grid-flow-col grid-rows-1 gap-6 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
++        {entries.map((entry) => (
++          <Card
++            key={`${entry.kind}-${entry.id}`}
++            className="w-[70vw] shrink-0 snap-start overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-auto"
++          >
++            {entry.image_url && (
++              <div className="aspect-square overflow-hidden bg-muted">
++                <img src={entry.image_url} alt={entry.name} className="h-full w-full object-cover" />
++              </div>
++            )}
++            <CardContent className="p-4">
++              <h3 className="mb-1 truncate font-semibold">{entry.name}</h3>
++              <div className="flex items-center justify-between gap-2">
++                <span className="font-bold">${money(entry.price)}</span>
++                {entry.kind === "product" ? (
++                  <Button
++                    size="sm"
++                    style={{ backgroundColor: accentColor }}
++                    onClick={() => {
++                      onAddToCart(entry)
++                      setAddedId(entry.id)
++                      window.setTimeout(() => setAddedId((c) => (c === entry.id ? null : c)), 1200)
++                    }}
++                  >
++                    {addedId === entry.id ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
++                  </Button>
++                ) : (
++                  <Button size="sm" style={{ backgroundColor: accentColor }} onClick={() => onBookService(entry)}>
++                    <CalendarDays className="h-4 w-4" />
++                  </Button>
 +                )}
-+              >
-+                <ShoppingBag className="h-[18px] w-[18px] shrink-0" />
-+                <span className="flex-1 text-left">Orders/Bookings</span>
-+                <ChevronDown
-+                  className={cn("h-4 w-4 transition-transform", ordersOpen || isOrdersSection ? "rotate-180" : "")}
-+                />
-+              </button>
-+              {(ordersOpen || isOrdersSection) && (
-+                <div className="ml-6 mt-1 space-y-1 border-l border-white/15 pl-3">
-+                  <Link
-+                    href="/dashboard/orders"
-+                    className={cn(
-+                      "block rounded-lg px-3 py-1.5 text-sm transition-colors",
-+                      pathname === "/dashboard/orders"
-+                        ? "text-white font-medium"
-+                        : "text-white/70 hover:text-white",
-+                    )}
-+                  >
-+                    Orders
-+                  </Link>
-+                  <Link
-+                    href="/dashboard/bookings"
-+                    className={cn(
-+                      "block rounded-lg px-3 py-1.5 text-sm transition-colors",
-+                      pathname === "/dashboard/bookings"
-+                        ? "text-white font-medium"
-+                        : "text-white/70 hover:text-white",
-+                    )}
-+                  >
-+                    Bookings
-+                  </Link>
-+                </div>
-+              )}
-+            </div>
++              </div>
++            </CardContent>
++          </Card>
++        ))}
++      </div>
++    </section>
++  )
++}
+diff --git a/components/page-builder/blocks/product-grid-block.tsx b/components/page-builder/blocks/product-grid-block.tsx
+index 3afdc8c..beb8543 100644
+--- a/components/page-builder/blocks/product-grid-block.tsx
++++ b/components/page-builder/blocks/product-grid-block.tsx
+@@ -29,7 +29,7 @@ export function ProductGridBlock({ products, settings, onAddToCart }: BlockRende
+   }
+ 
+   return (
+-    <section className="container mx-auto px-4 py-12">
++    <section id="storefront-products" className="container mx-auto px-4 py-12">
+       <h2 className={`mb-10 text-3xl font-bold ${alignmentClass[settings.titleAlignment]}`}>{settings.title}</h2>
+       {products.length === 0 ? (
+         <div className="py-12 text-center">
+diff --git a/components/page-builder/blocks/service-grid-block.tsx b/components/page-builder/blocks/service-grid-block.tsx
+index fec5b70..eac1139 100644
+--- a/components/page-builder/blocks/service-grid-block.tsx
++++ b/components/page-builder/blocks/service-grid-block.tsx
+@@ -17,7 +17,7 @@ const alignmentClass = {
+ export function ServiceGridBlock({ services, settings, onBookService }: BlockRenderProps<"service-grid">) {
+   if (services.length === 0) return null
+   return (
+-    <section id="services" className="scroll-mt-24 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
++    <section id="storefront-services" className="scroll-mt-24 mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+       <div className="mb-8"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Book</p><h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{settings.title}</h2></div>
+       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+         {services.map((service) => (
+diff --git a/components/page-builder/blocks/trust-block.tsx b/components/page-builder/blocks/trust-block.tsx
+new file mode 100644
+index 0000000..bf5e04a
+--- /dev/null
++++ b/components/page-builder/blocks/trust-block.tsx
+@@ -0,0 +1,28 @@
++import { ShieldCheck } from "lucide-react"
++import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 +
-+            <NavLink
-+              href="/dashboard/promotions"
-+              icon={Gift}
-+              label="Promotions"
-+              active={pathname === "/dashboard/promotions"}
-+            />
++const PRODUCT_DEFAULTS = ["Secure checkout", "Fast delivery", "Quality guaranteed", "Customer support"]
++const SERVICE_DEFAULTS = ["Verified business", "Easy booking", "Flexible scheduling", "Customer support"]
++
++export function TrustBlock({ business, settings }: BlockRenderProps<"trust">) {
++  const accentColor = business.accent_color || business.theme_color
++  const items =
++    settings.items.length > 0
++      ? settings.items
++      : business.business_type_mode === "services"
++        ? SERVICE_DEFAULTS
++        : PRODUCT_DEFAULTS
++
++  return (
++    <section className="container mx-auto px-4 py-8">
++      <div className="grid gap-4 border-y py-7 sm:grid-cols-2 lg:grid-cols-4">
++        {items.map((item) => (
++          <div key={item} className="flex items-center gap-2.5 px-3 py-2">
++            <ShieldCheck className="h-4 w-4 shrink-0" style={{ color: accentColor }} />
++            <span className="text-sm font-medium">{item}</span>
 +          </div>
++        ))}
++      </div>
++    </section>
++  )
++}
+diff --git a/components/page-builder/builder-canvas.tsx b/components/page-builder/builder-canvas.tsx
+index d4f3e89..0704b42 100644
+--- a/components/page-builder/builder-canvas.tsx
++++ b/components/page-builder/builder-canvas.tsx
+@@ -172,7 +172,7 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
+           </div>
+         </aside>
+ 
+-        <main className="relative flex flex-1 justify-center overflow-y-auto p-8">
++        <main className="relative flex flex-1 items-start justify-center overflow-y-auto p-8">
+           <div className="min-h-[800px] w-full max-w-[1200px] overflow-hidden rounded-lg border bg-white shadow-sm">
+             <BlockRenderer
+               schema={{ schemaVersion: 1, blocks }}
+@@ -180,6 +180,9 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
+               products={products}
+               services={services}
+               showHidden
++              onAddToCart={() => {}}
++              cartItemCount={0}
++              onCartOpen={() => {}}
+             />
+           </div>
+         </main>
+@@ -200,6 +203,8 @@ export function BuilderCanvas({ business, products, services, onSaved }: Builder
+               <SettingsInspector
+                 block={selectedBlock}
+                 businessId={business.id}
++                products={products}
++                services={services}
+                 onChange={(settings) => updateBlockSettings(selectedBlock.id, settings)}
+               />
+             ) : (
+diff --git a/components/page-builder/settings-inspector.tsx b/components/page-builder/settings-inspector.tsx
+index b778800..191047b 100644
+--- a/components/page-builder/settings-inspector.tsx
++++ b/components/page-builder/settings-inspector.tsx
+@@ -1,10 +1,11 @@
+ "use client"
+ 
+ import { useRef, useState } from "react"
+-import { ImagePlus, Loader2, Trash2 } from "lucide-react"
++import { ImagePlus, Loader2, Trash2, Plus, X, Search } from "lucide-react"
+ import { getSupabaseClient } from "@/lib/supabase"
+ import { blockSettingsSchemas } from "@/lib/page-builder/block-schemas"
+-import type { Block, BlockType, BlockSettingsMap } from "@/lib/page-builder/types"
++import type { Block, BlockSettingsMap } from "@/lib/page-builder/types"
++import type { Product, Service } from "@/components/dashboard-content"
+ import { AlignmentControl } from "./alignment-control"
+ import { Button } from "@/components/ui/button"
+ import { Input } from "@/components/ui/input"
+@@ -16,12 +17,11 @@ import { cn } from "@/lib/utils"
+ interface SettingsInspectorProps {
+   block: Block
+   businessId: string
++  products: Product[]
++  services: Service[]
+   onChange: (settings: Block["settings"]) => void
+ }
+ 
+-const textAlignClass = (value: "left" | "center" | "right") =>
+-  value === "left" ? "text-left" : value === "right" ? "text-right" : "text-center"
+-
+ function FieldLabel({ children }: { children: React.ReactNode }) {
+   return <Label className="text-xs font-medium">{children}</Label>
+ }
+@@ -64,7 +64,9 @@ function AlignmentSelect({
+ }) {
+   return (
+     <Select value={value} onValueChange={(v) => onChange(v as "left" | "center" | "right")}>
+-      <SelectTrigger><SelectValue /></SelectTrigger>
++      <SelectTrigger>
++        <SelectValue />
++      </SelectTrigger>
+       <SelectContent>
+         <SelectItem value="left">Left</SelectItem>
+         <SelectItem value="center">Center</SelectItem>
+@@ -75,10 +77,12 @@ function AlignmentSelect({
+ }
+ 
+ function ImageField({
++  label = "Image",
+   value,
+   businessId,
+   onChange,
+ }: {
++  label?: string
+   value: string | null
+   businessId: string
+   onChange: (value: string | null) => void
+@@ -130,7 +134,7 @@ function ImageField({
+ 
+   return (
+     <div className="space-y-2">
+-      <FieldLabel>Image</FieldLabel>
++      <FieldLabel>{label}</FieldLabel>
+       {value ? (
+         <div className="overflow-hidden rounded-lg border">
+           <img src={value} alt="" className="aspect-video w-full object-cover" />
+@@ -166,6 +170,33 @@ function ImageField({
+   )
+ }
+ 
++function ListField({ items, onChange, max = 4 }: { items: string[]; onChange: (items: string[]) => void; max?: number }) {
++  return (
++    <div className="space-y-2">
++      {items.map((item, i) => (
++        <div key={i} className="flex gap-2">
++          <Input
++            value={item}
++            onChange={(e) => {
++              const next = [...items]
++              next[i] = e.target.value
++              onChange(next)
++            }}
++          />
++          <Button type="button" size="icon" variant="ghost" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
++            <X className="h-4 w-4" />
++          </Button>
 +        </div>
-+
-+        <div>
-+          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Tools</p>
-+          <div className="space-y-1">
-+            <NavLink
-+              href="/dashboard/settings"
-+              icon={Settings}
-+              label="Settings"
-+              active={pathname === "/dashboard/settings"}
-+            />
-+            <DropdownMenu>
-+              <DropdownMenuTrigger asChild>
-+                <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white">
-+                  <HelpCircle className="h-[18px] w-[18px] shrink-0" />
-+                  <span>Help</span>
-+                </button>
-+              </DropdownMenuTrigger>
-+              <DropdownMenuContent align="start" side="right">
-+                <DropdownMenuItem asChild>
-+                  <a href="mailto:support@zentry.app">Contact support</a>
-+                </DropdownMenuItem>
-+                <DropdownMenuItem asChild>
-+                  <Link href="/dashboard/settings">Account settings</Link>
-+                </DropdownMenuItem>
-+              </DropdownMenuContent>
-+            </DropdownMenu>
-+          </div>
-+        </div>
-+      </nav>
-+
-+      <button
-+        onClick={handleSignOut}
-+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-+      >
-+        <LogOut className="h-[18px] w-[18px] shrink-0" />
-+        <span>Logout</span>
-+      </button>
++      ))}
++      {items.length < max && (
++        <Button type="button" size="sm" variant="outline" onClick={() => onChange([...items, ""])}>
++          <Plus className="mr-2 h-4 w-4" /> Add item
++        </Button>
++      )}
 +    </div>
 +  )
 +}
 +
-+export function DashboardSidebar({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
-+  return (
-+    <aside className="hidden lg:flex h-screen w-64 shrink-0 flex-col bg-primary px-4 py-6 sticky top-0">
-+      <SidebarNavContent inventoryHref={inventoryHref} />
-+    </aside>
-+  )
-+}
-+
-+export function MobileDashboardNav({ inventoryHref = "/dashboard/inventory" }: { inventoryHref?: string }) {
-+  const [open, setOpen] = useState(false)
-+  return (
-+    <Sheet open={open} onOpenChange={setOpen}>
-+      <SheetTrigger asChild>
-+        <Button variant="outline" size="icon" className="lg:hidden bg-transparent shrink-0">
-+          <Menu className="h-4 w-4" />
-+          <span className="sr-only">Open menu</span>
-+        </Button>
-+      </SheetTrigger>
-+      <SheetContent side="left" className="w-64 bg-primary border-none p-4 py-6 [&_button]:text-white">
-+        <SheetTitle className="sr-only">Navigation</SheetTitle>
-+        <SidebarNavContent inventoryHref={inventoryHref} />
-+      </SheetContent>
-+    </Sheet>
-+  )
-+}
-diff --git a/components/dashboard/inventory/category-field.tsx b/components/dashboard/inventory/category-field.tsx
-new file mode 100644
-index 0000000..c9c5ffb
---- /dev/null
-+++ b/components/dashboard/inventory/category-field.tsx
-@@ -0,0 +1,56 @@
-+"use client"
-+
-+import { Input } from "@/components/ui/input"
-+import { Label } from "@/components/ui/label"
-+
-+interface CategoryFieldProps {
-+  value: string
-+  onChange: (value: string) => void
-+  existingCategories: string[]
-+  id?: string
-+  disabled?: boolean
-+  required?: boolean
-+}
-+
-+/**
-+ * Free-text category input with autocomplete suggestions drawn from the
-+ * business's existing product categories, so owners don't accidentally
-+ * fragment the storefront with near-duplicate categories ("Shoes" vs "shoe").
-+ * Typing a brand-new value is always allowed — this never restricts you to
-+ * a fixed list.
-+ */
-+export function CategoryField({
-+  value,
+ function HeroInspector({
+   settings,
+   businessId,
+@@ -199,11 +230,110 @@ function HeroInspector({
+   )
+ }
+ 
+-export function SettingsInspector({ block, businessId, onChange }: SettingsInspectorProps) {
++function ItemPicker({
++  products,
++  services,
++  selectedProductIds,
++  selectedServiceIds,
 +  onChange,
-+  existingCategories,
-+  id = "category",
-+  disabled,
-+  required,
-+}: CategoryFieldProps) {
-+  const listId = `${id}-suggestions`
++  max,
++}: {
++  products: Product[]
++  services: Service[]
++  selectedProductIds: string[]
++  selectedServiceIds: string[]
++  onChange: (productIds: string[], serviceIds: string[]) => void
++  max: number
++}) {
++  const [query, setQuery] = useState("")
++  const totalSelected = selectedProductIds.length + selectedServiceIds.length
++  const q = query.trim().toLowerCase()
++
++  const filteredProducts = q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products
++  const filteredServices = q ? services.filter((s) => s.name.toLowerCase().includes(q)) : services
++
++  const toggleProduct = (id: string) => {
++    const next = selectedProductIds.includes(id) ? selectedProductIds.filter((i) => i !== id) : [...selectedProductIds, id]
++    onChange(next, selectedServiceIds)
++  }
++  const toggleService = (id: string) => {
++    const next = selectedServiceIds.includes(id) ? selectedServiceIds.filter((i) => i !== id) : [...selectedServiceIds, id]
++    onChange(selectedProductIds, next)
++  }
++
++  const atLimit = totalSelected >= max
++
 +  return (
 +    <div className="space-y-2">
-+      <Label htmlFor={id}>
-+        Category {required && <span className="text-destructive">*</span>}
-+      </Label>
-+      <Input
-+        id={id}
-+        list={listId}
-+        placeholder="e.g., Man Shoes"
-+        value={value}
-+        onChange={(e) => onChange(e.target.value)}
-+        disabled={disabled}
-+        required={required}
-+        autoComplete="off"
-+      />
-+      <datalist id={listId}>
-+        {existingCategories.map((c) => (
-+          <option key={c} value={c} />
-+        ))}
-+      </datalist>
++      <div className="flex items-center justify-between">
++        <FieldLabel>Choose items ({totalSelected}/{max})</FieldLabel>
++        {totalSelected > 0 && (
++          <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => onChange([], [])}>
++            Clear
++          </button>
++        )}
++      </div>
++      <div className="relative">
++        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
++        <Input placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
++      </div>
++      <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border p-2">
++        {filteredProducts.length === 0 && filteredServices.length === 0 && (
++          <p className="p-2 text-xs text-muted-foreground">No matches.</p>
++        )}
++        {filteredProducts.map((p) => {
++          const checked = selectedProductIds.includes(p.id)
++          const disabled = !checked && atLimit
++          return (
++            <label
++              key={p.id}
++              className={cn(
++                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60",
++                disabled && "cursor-not-allowed opacity-50",
++              )}
++            >
++              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleProduct(p.id)} className="shrink-0" />
++              <span className="flex-1 truncate">{p.name}</span>
++              <span className="shrink-0 text-xs text-muted-foreground">${Number(p.price).toFixed(2)}</span>
++            </label>
++          )
++        })}
++        {filteredServices.map((s) => {
++          const checked = selectedServiceIds.includes(s.id)
++          const disabled = !checked && atLimit
++          return (
++            <label
++              key={s.id}
++              className={cn(
++                "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60",
++                disabled && "cursor-not-allowed opacity-50",
++              )}
++            >
++              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggleService(s.id)} className="shrink-0" />
++              <span className="flex-1 truncate">{s.name}</span>
++              <span className="shrink-0 text-xs text-muted-foreground">${Number(s.price).toFixed(2)}</span>
++            </label>
++          )
++        })}
++      </div>
 +      <p className="text-xs text-muted-foreground">
-+        Products with the same category are grouped together on your storefront.
++        {totalSelected === 0
++          ? "Nothing chosen — shows your most recent items by default."
++          : `Showing your ${totalSelected} chosen item${totalSelected === 1 ? "" : "s"}.`}
 +      </p>
 +    </div>
 +  )
 +}
-diff --git a/components/dashboard/inventory/inventory-content.tsx b/components/dashboard/inventory/inventory-content.tsx
-new file mode 100644
-index 0000000..b560156
---- /dev/null
-+++ b/components/dashboard/inventory/inventory-content.tsx
-@@ -0,0 +1,418 @@
-+"use client"
 +
-+import { useEffect, useMemo, useState } from "react"
-+import { useRouter } from "next/navigation"
-+import Link from "next/link"
-+import {
-+  Plus,
-+  Search,
-+  MoreHorizontal,
-+  Pencil,
-+  Trash2,
-+  Eye,
-+  EyeOff,
-+  Minus,
-+  AlertTriangle,
-+  RotateCcw,
-+  ArrowLeft,
-+} from "lucide-react"
-+import { getSupabaseClient } from "@/lib/supabase"
-+import { distinctCategories, getStockStatus, type StockStatus } from "@/lib/product-categories"
-+import type { Business, Product } from "@/components/dashboard-content"
-+import { Button } from "@/components/ui/button"
-+import { Input } from "@/components/ui/input"
-+import { Badge } from "@/components/ui/badge"
-+import { Card, CardContent } from "@/components/ui/card"
-+import {
-+  Select,
-+  SelectContent,
-+  SelectItem,
-+  SelectTrigger,
-+  SelectValue,
-+} from "@/components/ui/select"
-+import {
-+  DropdownMenu,
-+  DropdownMenuContent,
-+  DropdownMenuItem,
-+  DropdownMenuSeparator,
-+  DropdownMenuTrigger,
-+} from "@/components/ui/dropdown-menu"
-+import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
-+import { ProductFormDialog } from "@/components/dashboard/inventory/product-form-dialog"
-+
-+interface InventoryContentProps {
-+  business: Business
-+  products: Product[]
-+  onProductsChange: () => void
-+  autoOpenAdd?: boolean
-+}
-+
-+type StatusFilter = "all" | "active" | "inactive"
-+type StockFilter = "all" | "low" | "out" | "not-tracked"
-+
-+const STOCK_BADGE: Record<StockStatus, { label: string; className: string }> = {
-+  "in-stock": { label: "In stock", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400" },
-+  low: { label: "Low stock", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" },
-+  out: { label: "Out of stock", className: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" },
-+  "not-tracked": { label: "Not tracked", className: "bg-muted text-muted-foreground" },
-+}
-+
-+export function InventoryContent({ business, products, onProductsChange, autoOpenAdd }: InventoryContentProps) {
-+  const router = useRouter()
-+  const [search, setSearch] = useState("")
-+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
-+  const [stockFilter, setStockFilter] = useState<StockFilter>("all")
-+  const [minPrice, setMinPrice] = useState("")
-+  const [maxPrice, setMaxPrice] = useState("")
-+
-+  const [formOpen, setFormOpen] = useState(false)
-+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-+  const [pendingStockId, setPendingStockId] = useState<string | null>(null)
-+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-+
-+  const categories = useMemo(() => distinctCategories(products), [products])
-+
-+  useEffect(() => {
-+    if (autoOpenAdd) {
-+      setEditingProduct(null)
-+      setFormOpen(true)
-+    }
-+    // eslint-disable-next-line react-hooks/exhaustive-deps
-+  }, [autoOpenAdd])
-+
-+  const filtered = useMemo(() => {
-+    return products.filter((p) => {
-+      if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false
-+      if (statusFilter === "active" && !p.is_available) return false
-+      if (statusFilter === "inactive" && p.is_available) return false
-+      if (categoryFilter !== "all" && (p.category || "Other") !== categoryFilter) return false
-+
-+      const status = getStockStatus(p)
-+      if (stockFilter === "low" && status !== "low") return false
-+      if (stockFilter === "out" && status !== "out") return false
-+      if (stockFilter === "not-tracked" && status !== "not-tracked") return false
-+
-+      const min = Number.parseFloat(minPrice)
-+      const max = Number.parseFloat(maxPrice)
-+      if (!Number.isNaN(min) && Number(p.price) < min) return false
-+      if (!Number.isNaN(max) && Number(p.price) > max) return false
-+
-+      return true
-+    })
-+  }, [products, search, statusFilter, categoryFilter, stockFilter, minPrice, maxPrice])
-+
-+  const resetFilters = () => {
-+    setSearch("")
-+    setStatusFilter("all")
-+    setCategoryFilter("all")
-+    setStockFilter("all")
-+    setMinPrice("")
-+    setMaxPrice("")
-+  }
-+
-+  const handleOpenAdd = () => {
-+    setEditingProduct(null)
-+    setFormOpen(true)
-+  }
-+
-+  const handleOpenEdit = (product: Product) => {
-+    setEditingProduct(product)
-+    setFormOpen(true)
-+  }
-+
-+  const handleToggleAvailability = async (product: Product) => {
-+    const supabase = getSupabaseClient() as any
-+    await supabase.from("products").update({ is_available: !product.is_available }).eq("id", product.id)
-+    onProductsChange()
-+  }
-+
-+  const handleDelete = async (productId: string) => {
-+    if (!confirm("Delete this product? This can't be undone.")) return
-+    setPendingDeleteId(productId)
-+    try {
-+      const supabase = getSupabaseClient() as any
-+      await supabase.from("products").delete().eq("id", productId)
-+      onProductsChange()
-+    } finally {
-+      setPendingDeleteId(null)
-+    }
-+  }
-+
-+  const adjustStock = async (product: Product, delta: number) => {
-+    if (!product.track_inventory || product.stock_quantity === null) return
-+    const next = Math.max(0, product.stock_quantity + delta)
-+    setPendingStockId(product.id)
-+    try {
-+      const supabase = getSupabaseClient() as any
-+      await supabase.from("products").update({ stock_quantity: next }).eq("id", product.id)
-+      onProductsChange()
-+    } finally {
-+      setPendingStockId(null)
-+    }
-+  }
-+
-+  return (
-+    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-+      {/* Header */}
-+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-+        <div className="flex items-center gap-3">
-+          <MobileDashboardNav />
-+          <div>
-+            <Link
-+              href="/dashboard"
-+              className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-+            >
-+              <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
-+            </Link>
-+            <h1 className="text-2xl font-bold">Inventory</h1>
-+            <p className="text-sm text-muted-foreground">
-+              {products.length} product{products.length !== 1 ? "s" : ""} · manage stock, pricing, and categories
-+            </p>
++export function SettingsInspector({ block, businessId, products, services, onChange }: SettingsInspectorProps) {
+   const schema = blockSettingsSchemas[block.type]
+   const result = schema.safeParse(block.settings)
+   if (!result.success) {
+-    return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">This section has invalid settings. Reset or remove it before publishing.</div>
++    return (
++      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
++        This section has invalid settings. Reset or remove it before publishing.
++      </div>
++    )
+   }
+ 
+   const update = (settings: Block["settings"]) => {
+@@ -212,9 +342,89 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
+   }
+ 
+   switch (block.type) {
++    case "announcement-bar":
++      return (
++        <div className="space-y-5">
++          <div className="space-y-2">
++            <FieldLabel>Text</FieldLabel>
++            <Input value={block.settings.text} onChange={(e) => update({ ...block.settings, text: e.target.value })} />
++          </div>
++          <div className="space-y-2">
++            <FieldLabel>Link (optional)</FieldLabel>
++            <Input
++              value={block.settings.link}
++              placeholder="https://... or #storefront-products"
++              onChange={(e) => update({ ...block.settings, link: e.target.value })}
++            />
 +          </div>
 +        </div>
-+        <Button onClick={handleOpenAdd} className="shrink-0">
-+          <Plus className="h-4 w-4 mr-2" /> Add Product
-+        </Button>
-+      </div>
++      )
 +
-+      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-+        {/* Filters */}
-+        <Card className="h-fit lg:sticky lg:top-6">
-+          <CardContent className="space-y-5 pt-6">
++    case "navbar":
++      return (
++        <div className="space-y-5">
++          <ToggleField label="Show search" value={block.settings.showSearch} onChange={(showSearch) => update({ ...block.settings, showSearch })} />
++          <ToggleField label="Show cart" value={block.settings.showCart} onChange={(showCart) => update({ ...block.settings, showCart })} />
++          <p className="text-xs text-muted-foreground">
++            Nav links (Shop, Services, About, Contact) show up automatically based on what your business has —
++            nothing to configure there.
++          </p>
++        </div>
++      )
++
+     case "hero":
+       return <HeroInspector settings={block.settings} businessId={businessId} onChange={(value) => update(value)} />
+ 
++    case "popular":
++      return (
++        <div className="space-y-5">
++          <div className="space-y-2">
++            <FieldLabel>Section title</FieldLabel>
++            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
++          </div>
++          <ItemPicker
++            products={products}
++            services={services}
++            selectedProductIds={block.settings.productIds}
++            selectedServiceIds={block.settings.serviceIds}
++            max={block.settings.maxItems}
++            onChange={(productIds, serviceIds) => update({ ...block.settings, productIds, serviceIds })}
++          />
++          <div className="space-y-2">
++            <FieldLabel>Max items shown</FieldLabel>
++            <Input
++              type="number"
++              min={1}
++              max={12}
++              value={block.settings.maxItems}
++              onChange={(e) => {
++                const maxItems = Math.min(12, Math.max(1, Number(e.target.value) || 1))
++                update({
++                  ...block.settings,
++                  maxItems,
++                  productIds: block.settings.productIds.slice(0, maxItems),
++                  serviceIds: block.settings.serviceIds.slice(0, maxItems),
++                })
++              }}
++            />
++          </div>
++        </div>
++      )
++
++    case "categories":
++      return (
++        <div className="space-y-5">
++          <div className="space-y-2">
++            <FieldLabel>Section title</FieldLabel>
++            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
++          </div>
++          <p className="text-xs text-muted-foreground">
++            Categories are pulled automatically from your products and services — add a category to an item to have
++            it show up here.
++          </p>
++        </div>
++      )
++
+     case "product-grid":
+       return (
+         <div className="space-y-5">
+@@ -244,6 +454,55 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
+         </div>
+       )
+ 
++    case "banner":
++      return (
++        <div className="space-y-5">
++          <div className="space-y-2">
++            <FieldLabel>Heading</FieldLabel>
++            <Input value={block.settings.heading} onChange={(e) => update({ ...block.settings, heading: e.target.value })} />
++          </div>
++          <div className="space-y-2">
++            <FieldLabel>Description</FieldLabel>
++            <Textarea value={block.settings.description} rows={3} onChange={(e) => update({ ...block.settings, description: e.target.value })} />
++          </div>
++          <div className="grid grid-cols-2 gap-3">
 +            <div className="space-y-2">
-+              <Label>Search</Label>
-+              <div className="relative">
-+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-+                <Input
-+                  placeholder="Search products..."
-+                  value={search}
-+                  onChange={(e) => setSearch(e.target.value)}
-+                  className="pl-8"
-+                />
-+              </div>
++              <FieldLabel>Button text</FieldLabel>
++              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
 +            </div>
-+
 +            <div className="space-y-2">
-+              <Label>Status</Label>
-+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-+                <SelectTrigger>
-+                  <SelectValue />
-+                </SelectTrigger>
-+                <SelectContent>
-+                  <SelectItem value="all">All products</SelectItem>
-+                  <SelectItem value="active">Visible on storefront</SelectItem>
-+                  <SelectItem value="inactive">Hidden</SelectItem>
-+                </SelectContent>
-+              </Select>
++              <FieldLabel>Button link</FieldLabel>
++              <Input value={block.settings.ctaLink} onChange={(e) => update({ ...block.settings, ctaLink: e.target.value })} />
 +            </div>
-+
-+            <div className="space-y-2">
-+              <Label>Category</Label>
-+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-+                <SelectTrigger>
-+                  <SelectValue />
-+                </SelectTrigger>
-+                <SelectContent>
-+                  <SelectItem value="all">All categories</SelectItem>
-+                  {categories.map((c) => (
-+                    <SelectItem key={c} value={c}>
-+                      {c}
-+                    </SelectItem>
-+                  ))}
-+                  <SelectItem value="Other">Other (uncategorized)</SelectItem>
-+                </SelectContent>
-+              </Select>
-+            </div>
-+
-+            <div className="space-y-2">
-+              <Label>Stock alert</Label>
-+              <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as StockFilter)}>
-+                <SelectTrigger>
-+                  <SelectValue />
-+                </SelectTrigger>
-+                <SelectContent>
-+                  <SelectItem value="all">All stock</SelectItem>
-+                  <SelectItem value="low">Low stock</SelectItem>
-+                  <SelectItem value="out">Out of stock</SelectItem>
-+                  <SelectItem value="not-tracked">Not tracked</SelectItem>
-+                </SelectContent>
-+              </Select>
-+            </div>
-+
-+            <div className="space-y-2">
-+              <Label>Price range</Label>
-+              <div className="flex items-center gap-2">
-+                <Input
-+                  type="number"
-+                  min="0"
-+                  placeholder="Min"
-+                  value={minPrice}
-+                  onChange={(e) => setMinPrice(e.target.value)}
-+                />
-+                <Input
-+                  type="number"
-+                  min="0"
-+                  placeholder="Max"
-+                  value={maxPrice}
-+                  onChange={(e) => setMaxPrice(e.target.value)}
-+                />
-+              </div>
-+            </div>
-+
-+            <Button variant="outline" className="w-full bg-transparent" onClick={resetFilters}>
-+              <RotateCcw className="h-4 w-4 mr-2" /> Reset filters
-+            </Button>
-+          </CardContent>
-+        </Card>
-+
-+        {/* Product list */}
-+        <div className="space-y-3">
-+          {products.length === 0 ? (
-+            <Card>
-+              <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-+                <p className="text-muted-foreground">No products yet — add your first one to get started.</p>
-+                <Button onClick={handleOpenAdd}>
-+                  <Plus className="h-4 w-4 mr-2" /> Add Product
-+                </Button>
-+              </CardContent>
-+            </Card>
-+          ) : filtered.length === 0 ? (
-+            <Card>
-+              <CardContent className="py-16 text-center text-muted-foreground">
-+                No products match these filters.
-+              </CardContent>
-+            </Card>
++          </div>
++          <div className="space-y-2">
++            <FieldLabel>Media type</FieldLabel>
++            <Select value={block.settings.mediaType} onValueChange={(v) => update({ ...block.settings, mediaType: v as "image" | "video" })}>
++              <SelectTrigger>
++                <SelectValue />
++              </SelectTrigger>
++              <SelectContent>
++                <SelectItem value="image">Image</SelectItem>
++                <SelectItem value="video">Video (MP4)</SelectItem>
++              </SelectContent>
++            </Select>
++          </div>
++          {block.settings.mediaType === "image" ? (
++            <ImageField label="Banner image" value={block.settings.mediaUrl} businessId={businessId} onChange={(mediaUrl) => update({ ...block.settings, mediaUrl })} />
 +          ) : (
-+            filtered.map((product) => {
-+              const status = getStockStatus(product)
-+              const badge = STOCK_BADGE[status]
-+              return (
-+                <Card key={product.id} className={!product.is_available ? "opacity-60" : ""}>
-+                  <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-+                    <div className="flex flex-1 items-center gap-4 min-w-0">
-+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
-+                        {product.image_url ? (
-+                          <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
-+                        ) : null}
-+                      </div>
-+                      <div className="min-w-0">
-+                        <div className="flex items-center gap-2">
-+                          <p className="truncate font-semibold">{product.name}</p>
-+                          {!product.is_available && (
-+                            <Badge variant="secondary" className="shrink-0">
-+                              Hidden
-+                            </Badge>
-+                          )}
-+                        </div>
-+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-+                          <span>{product.category || "Other"}</span>
-+                          <span>·</span>
-+                          <Badge className={`border-transparent ${badge.className}`}>{badge.label}</Badge>
-+                          {status !== "not-tracked" && (
-+                            <span>
-+                              {product.stock_quantity} in stock
-+                            </span>
-+                          )}
-+                        </div>
-+                      </div>
-+                    </div>
-+
-+                    <div className="flex items-center justify-between gap-4 sm:justify-end">
-+                      {product.track_inventory && product.stock_quantity !== null && (
-+                        <div className="flex items-center gap-1 rounded-md border">
-+                          <Button
-+                            type="button"
-+                            variant="ghost"
-+                            size="icon"
-+                            className="h-8 w-8"
-+                            disabled={pendingStockId === product.id || product.stock_quantity <= 0}
-+                            onClick={() => adjustStock(product, -1)}
-+                          >
-+                            <Minus className="h-3.5 w-3.5" />
-+                          </Button>
-+                          <span className="w-8 text-center text-sm font-medium tabular-nums">
-+                            {product.stock_quantity}
-+                          </span>
-+                          <Button
-+                            type="button"
-+                            variant="ghost"
-+                            size="icon"
-+                            className="h-8 w-8"
-+                            disabled={pendingStockId === product.id}
-+                            onClick={() => adjustStock(product, 1)}
-+                          >
-+                            <Plus className="h-3.5 w-3.5" />
-+                          </Button>
-+                        </div>
-+                      )}
-+
-+                      <div className="text-right">
-+                        <p className="font-semibold">${Number(product.price).toFixed(2)}</p>
-+                      </div>
-+
-+                      <DropdownMenu>
-+                        <DropdownMenuTrigger asChild>
-+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-+                            <MoreHorizontal className="h-4 w-4" />
-+                          </Button>
-+                        </DropdownMenuTrigger>
-+                        <DropdownMenuContent align="end">
-+                          <DropdownMenuItem onClick={() => handleOpenEdit(product)}>
-+                            <Pencil className="h-4 w-4 mr-2" /> Edit
-+                          </DropdownMenuItem>
-+                          <DropdownMenuItem onClick={() => handleToggleAvailability(product)}>
-+                            {product.is_available ? (
-+                              <>
-+                                <EyeOff className="h-4 w-4 mr-2" /> Hide from storefront
-+                              </>
-+                            ) : (
-+                              <>
-+                                <Eye className="h-4 w-4 mr-2" /> Show on storefront
-+                              </>
-+                            )}
-+                          </DropdownMenuItem>
-+                          <DropdownMenuSeparator />
-+                          <DropdownMenuItem
-+                            className="text-destructive focus:text-destructive"
-+                            disabled={pendingDeleteId === product.id}
-+                            onClick={() => handleDelete(product.id)}
-+                          >
-+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-+                          </DropdownMenuItem>
-+                        </DropdownMenuContent>
-+                      </DropdownMenu>
-+                    </div>
-+                  </CardContent>
-+                  {status === "out" && product.is_available && (
-+                    <div className="flex items-center gap-2 border-t bg-red-50 px-4 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-400">
-+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-+                      Out of stock and still visible on your storefront. Hide it from the menu above if you don't
-+                      want customers to order it.
-+                    </div>
-+                  )}
-+                </Card>
-+              )
-+            })
++            <div className="space-y-2">
++              <FieldLabel>Video URL (.mp4)</FieldLabel>
++              <Input
++                value={block.settings.mediaUrl ?? ""}
++                placeholder="https://.../promo.mp4"
++                onChange={(e) => update({ ...block.settings, mediaUrl: e.target.value || null })}
++              />
++              <p className="text-xs text-muted-foreground">Plays muted and looped, no upload — paste a hosted MP4 link.</p>
++            </div>
 +          )}
 +        </div>
-+      </div>
++      )
 +
-+      <ProductFormDialog
-+        open={formOpen}
-+        onOpenChange={setFormOpen}
-+        businessId={business.id}
-+        existingCategories={categories}
-+        product={editingProduct}
-+        onSaved={() => {
-+          router.refresh()
-+          onProductsChange()
-+        }}
-+      />
-+    </div>
-+  )
-+}
-+
-+function Label({ children }: { children: React.ReactNode }) {
-+  return <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>
-+}
-diff --git a/components/dashboard/inventory/product-form-dialog.tsx b/components/dashboard/inventory/product-form-dialog.tsx
-new file mode 100644
-index 0000000..eee65cf
---- /dev/null
-+++ b/components/dashboard/inventory/product-form-dialog.tsx
-@@ -0,0 +1,268 @@
-+"use client"
-+
-+import type React from "react"
-+import { useEffect, useState } from "react"
-+import { Button } from "@/components/ui/button"
-+import { Input } from "@/components/ui/input"
-+import { Label } from "@/components/ui/label"
-+import { Textarea } from "@/components/ui/textarea"
-+import { Switch } from "@/components/ui/switch"
-+import {
-+  Dialog,
-+  DialogContent,
-+  DialogDescription,
-+  DialogFooter,
-+  DialogHeader,
-+  DialogTitle,
-+} from "@/components/ui/dialog"
-+import { Alert, AlertDescription } from "@/components/ui/alert"
-+import { AlertCircle } from "lucide-react"
-+import { getSupabaseClient } from "@/lib/supabase"
-+import { CategoryField } from "@/components/dashboard/inventory/category-field"
-+import type { Product } from "@/components/dashboard-content"
-+
-+interface ProductFormDialogProps {
-+  open: boolean
-+  onOpenChange: (open: boolean) => void
-+  businessId: string
-+  existingCategories: string[]
-+  /** When editing, pass the product to prefill. Omit/null to create a new product. */
-+  product?: Product | null
-+  onSaved?: () => void
-+}
-+
-+const EMPTY_FORM = {
-+  name: "",
-+  description: "",
-+  price: "",
-+  category: "",
-+  imageUrl: "",
-+  trackInventory: false,
-+  stockQuantity: "",
-+  lowStockThreshold: "5",
-+}
-+
-+export function ProductFormDialog({
-+  open,
-+  onOpenChange,
-+  businessId,
-+  existingCategories,
-+  product,
-+  onSaved,
-+}: ProductFormDialogProps) {
-+  const isEditing = !!product
-+  const [loading, setLoading] = useState(false)
-+  const [error, setError] = useState<string | null>(null)
-+  const [form, setForm] = useState(EMPTY_FORM)
-+
-+  useEffect(() => {
-+    if (!open) return
-+    if (product) {
-+      setForm({
-+        name: product.name,
-+        description: product.description ?? "",
-+        price: String(product.price ?? ""),
-+        category: product.category ?? "",
-+        imageUrl: product.image_url ?? "",
-+        trackInventory: !!product.track_inventory,
-+        stockQuantity: product.stock_quantity != null ? String(product.stock_quantity) : "",
-+        lowStockThreshold: product.low_stock_threshold != null ? String(product.low_stock_threshold) : "5",
-+      })
-+    } else {
-+      setForm(EMPTY_FORM)
-+    }
-+    setError(null)
-+  }, [open, product])
-+
-+  const handleSubmit = async (e: React.FormEvent) => {
-+    e.preventDefault()
-+    setError(null)
-+
-+    if (form.trackInventory && form.stockQuantity.trim() === "") {
-+      setError("Enter a starting stock quantity, or turn off stock tracking.")
-+      return
-+    }
-+
-+    setLoading(true)
-+    try {
-+      const supabase = getSupabaseClient() as any
-+
-+      const payload = {
-+        name: form.name,
-+        description: form.description || null,
-+        price: Number.parseFloat(form.price),
-+        category: form.category.trim() || null,
-+        image_url: form.imageUrl || null,
-+        track_inventory: form.trackInventory,
-+        stock_quantity: form.trackInventory ? Number.parseInt(form.stockQuantity, 10) : null,
-+        low_stock_threshold: form.trackInventory
-+          ? Number.parseInt(form.lowStockThreshold || "5", 10)
-+          : null,
-+      }
-+
-+      if (isEditing && product) {
-+        const { error: updateError } = await supabase.from("products").update(payload).eq("id", product.id)
-+        if (updateError) throw updateError
-+      } else {
-+        const { error: insertError } = await supabase.from("products").insert({
-+          ...payload,
-+          business_id: businessId,
-+          is_available: true,
-+        })
-+        if (insertError) throw insertError
-+      }
-+
-+      onOpenChange(false)
-+      onSaved?.()
-+    } catch (err: any) {
-+      setError(err.message || "Failed to save product")
-+    } finally {
-+      setLoading(false)
-+    }
-+  }
-+
-+  return (
-+    <Dialog open={open} onOpenChange={onOpenChange}>
-+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-+        <DialogHeader>
-+          <DialogTitle>{isEditing ? "Edit Product" : "Add Product"}</DialogTitle>
-+          <DialogDescription>
-+            {isEditing ? "Update the details for this product." : "Add a new product to your inventory."}
-+          </DialogDescription>
-+        </DialogHeader>
-+
-+        <form onSubmit={handleSubmit} className="space-y-4">
-+          {error && (
-+            <Alert variant="destructive">
-+              <AlertCircle className="h-4 w-4" />
-+              <AlertDescription>{error}</AlertDescription>
-+            </Alert>
-+          )}
-+
-+          <div className="space-y-2">
-+            <Label htmlFor="name">
-+              Product name <span className="text-destructive">*</span>
-+            </Label>
-+            <Input
-+              id="name"
-+              placeholder="e.g., Adidas Samba"
-+              value={form.name}
-+              onChange={(e) => setForm({ ...form, name: e.target.value })}
-+              required
-+              disabled={loading}
-+            />
-+          </div>
-+
-+          <div className="space-y-2">
-+            <Label htmlFor="description">Description</Label>
-+            <Textarea
-+              id="description"
-+              placeholder="A little about this product..."
-+              value={form.description}
-+              onChange={(e) => setForm({ ...form, description: e.target.value })}
-+              disabled={loading}
-+              rows={3}
-+            />
-+          </div>
-+
-+          <div className="grid grid-cols-2 gap-4">
+     case "about":
+       return (
+         <div className="space-y-5">
+@@ -253,12 +512,51 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
+           </div>
+           <div className="space-y-2">
+             <FieldLabel>Body</FieldLabel>
+-            <Textarea value={block.settings.body ?? ""} rows={7} placeholder="Uses business description by default" onChange={(e) => update({ ...block.settings, body: e.target.value || null })} />
++            <Textarea value={block.settings.body ?? ""} rows={6} placeholder="Uses business description by default" onChange={(e) => update({ ...block.settings, body: e.target.value || null })} />
+           </div>
++          <ImageField label="Story image" value={block.settings.imageUrl} businessId={businessId} onChange={(imageUrl) => update({ ...block.settings, imageUrl })} />
+           <div className="space-y-2">
+-            <FieldLabel>Alignment</FieldLabel>
+-            <AlignmentSelect value={block.settings.alignment} onChange={(alignment) => update({ ...block.settings, alignment })} />
++            <FieldLabel>Image position</FieldLabel>
++            <Select value={block.settings.alignment} onValueChange={(v) => update({ ...block.settings, alignment: v as "left" | "center" | "right" })}>
++              <SelectTrigger>
++                <SelectValue />
++              </SelectTrigger>
++              <SelectContent>
++                <SelectItem value="left">Image on left</SelectItem>
++                <SelectItem value="right">Image on right</SelectItem>
++                <SelectItem value="center">No image, centered text</SelectItem>
++              </SelectContent>
++            </Select>
+           </div>
++          <div className="grid grid-cols-2 gap-3">
 +            <div className="space-y-2">
-+              <Label htmlFor="price">
-+                Price <span className="text-destructive">*</span>
-+              </Label>
-+              <Input
-+                id="price"
-+                type="number"
-+                step="0.01"
-+                min="0"
-+                placeholder="49.99"
-+                value={form.price}
-+                onChange={(e) => setForm({ ...form, price: e.target.value })}
-+                required
-+                disabled={loading}
-+              />
++              <FieldLabel>Button text (optional)</FieldLabel>
++              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
 +            </div>
-+            <CategoryField
-+              value={form.category}
-+              onChange={(v) => setForm({ ...form, category: v })}
-+              existingCategories={existingCategories}
-+              disabled={loading}
-+            />
-+          </div>
-+
-+          <div className="space-y-2">
-+            <Label htmlFor="imageUrl">Image URL</Label>
-+            <Input
-+              id="imageUrl"
-+              type="url"
-+              placeholder="https://example.com/image.jpg"
-+              value={form.imageUrl}
-+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-+              disabled={loading}
-+            />
-+          </div>
-+
-+          <div className="rounded-lg border p-3 space-y-3">
-+            <div className="flex items-center justify-between">
-+              <div>
-+                <Label htmlFor="trackInventory" className="cursor-pointer">
-+                  Track stock for this product
-+                </Label>
-+                <p className="text-xs text-muted-foreground">
-+                  Get low-stock alerts and manage stock from Inventory.
-+                </p>
-+              </div>
-+              <Switch
-+                id="trackInventory"
-+                checked={form.trackInventory}
-+                onCheckedChange={(checked) => setForm({ ...form, trackInventory: checked })}
-+                disabled={loading}
-+              />
++            <div className="space-y-2">
++              <FieldLabel>Button link</FieldLabel>
++              <Input value={block.settings.ctaLink} onChange={(e) => update({ ...block.settings, ctaLink: e.target.value })} />
 +            </div>
-+
-+            {form.trackInventory && (
-+              <div className="grid grid-cols-2 gap-4 pt-1">
-+                <div className="space-y-2">
-+                  <Label htmlFor="stockQuantity">
-+                    In stock <span className="text-destructive">*</span>
-+                  </Label>
-+                  <Input
-+                    id="stockQuantity"
-+                    type="number"
-+                    min="0"
-+                    placeholder="50"
-+                    value={form.stockQuantity}
-+                    onChange={(e) => setForm({ ...form, stockQuantity: e.target.value })}
-+                    disabled={loading}
-+                    required={form.trackInventory}
-+                  />
-+                </div>
-+                <div className="space-y-2">
-+                  <Label htmlFor="lowStockThreshold">Low stock at</Label>
-+                  <Input
-+                    id="lowStockThreshold"
-+                    type="number"
-+                    min="0"
-+                    placeholder="5"
-+                    value={form.lowStockThreshold}
-+                    onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })}
-+                    disabled={loading}
-+                  />
-+                </div>
-+              </div>
-+            )}
 +          </div>
++        </div>
++      )
 +
-+          <DialogFooter>
-+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="bg-transparent">
-+              Cancel
-+            </Button>
-+            <Button type="submit" disabled={loading}>
-+              {loading ? "Saving..." : isEditing ? "Save changes" : "Add product"}
-+            </Button>
-+          </DialogFooter>
-+        </form>
-+      </DialogContent>
-+    </Dialog>
-+  )
-+}
-diff --git a/lib/product-categories.ts b/lib/product-categories.ts
++    case "trust":
++      return (
++        <div className="space-y-5">
++          <p className="text-xs text-muted-foreground">Leave empty to use sensible defaults for your business type.</p>
++          <ListField items={block.settings.items} onChange={(items) => update({ ...block.settings, items })} />
++        </div>
++      )
++
++    case "footer":
++      return (
++        <div className="space-y-5">
++          <ToggleField label="Show social links" value={block.settings.showSocials} onChange={(showSocials) => update({ ...block.settings, showSocials })} />
++          <p className="text-xs text-muted-foreground">
++            Everything else in the footer (logo, description, contact info) comes from your business profile —
++            update it in Settings.
++          </p>
+         </div>
+       )
+ 
+@@ -269,13 +567,15 @@ export function SettingsInspector({ block, businessId, onChange }: SettingsInspe
+             <FieldLabel>Title</FieldLabel>
+             <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+           </div>
+-          {([
+-            ["showPhone", "Show phone"],
+-            ["showEmail", "Show email"],
+-            ["showAddress", "Show address"],
+-            ["showWhatsapp", "Show WhatsApp"],
+-            ["showInstagram", "Show Instagram"],
+-          ] as const).map(([key, label]) => (
++          {(
++            [
++              ["showPhone", "Show phone"],
++              ["showEmail", "Show email"],
++              ["showAddress", "Show address"],
++              ["showWhatsapp", "Show WhatsApp"],
++              ["showInstagram", "Show Instagram"],
++            ] as const
++          ).map(([key, label]) => (
+             <ToggleField key={key} label={label} value={block.settings[key]} onChange={(value) => update({ ...block.settings, [key]: value })} />
+           ))}
+           <div className="space-y-2">
+diff --git a/components/settings-content.tsx b/components/settings-content.tsx
+index ff8fcb9..f7e3c3f 100644
+--- a/components/settings-content.tsx
++++ b/components/settings-content.tsx
+@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label"
+ import { Textarea } from "@/components/ui/textarea"
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+ import { Alert, AlertDescription } from "@/components/ui/alert"
+-import { Sparkles, ArrowLeft, AlertCircle, CheckCircle, CheckCircle2 } from "lucide-react"
++import { Sparkles, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
+ import { getSupabaseClient } from "@/lib/supabase"
+-import { LAYOUT_CONFIGS, type LayoutStyle } from "@/lib/layouts"
++import { type LayoutStyle } from "@/lib/layouts"
++import { STOREFRONT_FONTS } from "@/lib/storefront-fonts"
+ 
+ interface Business {
+   id: string
+@@ -30,6 +31,7 @@ interface Business {
+   layout_style?: LayoutStyle
+   accent_color?: string | null
+   dark_mode_enabled?: boolean
++  font_family?: string | null
+ }
+ 
+ interface SettingsContentProps {
+@@ -53,6 +55,7 @@ export function SettingsContent({ business }: SettingsContentProps) {
+     instagramHandle: business.instagram_handle || "",
+     layoutStyle: business.layout_style || "classic-card" as LayoutStyle,
+     darkModeEnabled: business.dark_mode_enabled || false,
++    fontFamily: business.font_family || "inter",
+   })
+ 
+   const handleSubmit = async (e: React.FormEvent) => {
+@@ -76,6 +79,7 @@ export function SettingsContent({ business }: SettingsContentProps) {
+           accent_color: formData.accentColor,
+           layout_style: formData.layoutStyle,
+           dark_mode_enabled: formData.darkModeEnabled,
++          font_family: formData.fontFamily,
+           whatsapp_number: formData.whatsappNumber || null,
+           instagram_handle: formData.instagramHandle || null,
+         })
+@@ -243,31 +247,13 @@ export function SettingsContent({ business }: SettingsContentProps) {
+               <CardDescription>Customize how your business page looks</CardDescription>
+             </CardHeader>
+             <CardContent className="space-y-6">
+-              <div className="space-y-3">
+-                <Label>Layout Style</Label>
+-                <div className="grid sm:grid-cols-2 gap-3">
+-                  {LAYOUT_CONFIGS.map((layout) => (
+-                    <div
+-                      key={layout.id}
+-                      className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+-                        formData.layoutStyle === layout.id
+-                          ? "border-primary bg-primary/5"
+-                          : "border-border hover:border-primary/50"
+-                      }`}
+-                      onClick={() => setFormData({ ...formData, layoutStyle: layout.id })}
+-                    >
+-                      <div className="flex items-start gap-2">
+-                        <div className={`w-8 h-8 rounded ${layout.previewColor} flex-shrink-0`}></div>
+-                        <div className="flex-1 min-w-0">
+-                          <div className="font-medium text-sm truncate">{layout.name}</div>
+-                          {formData.layoutStyle === layout.id && (
+-                            <CheckCircle2 className="h-4 w-4 text-primary mt-1" />
+-                          )}
+-                        </div>
+-                      </div>
+-                    </div>
+-                  ))}
+-                </div>
++              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
++                Your storefront's layout and sections are now customized from{" "}
++                <Link href="/dashboard/design" className="font-medium text-primary hover:underline">
++                  Design
++                </Link>{" "}
++                — add, remove, and reorder sections there. The settings below still control your brand colors and
++                font everywhere on your page.
+               </div>
+ 
+               <div className="grid md:grid-cols-2 gap-4">
+@@ -311,6 +297,23 @@ export function SettingsContent({ business }: SettingsContentProps) {
+                     />
+                   </div>
+                 </div>
++                <div className="space-y-2">
++                  <Label htmlFor="fontFamily">Storefront Font</Label>
++                  <select
++                    id="fontFamily"
++                    value={formData.fontFamily}
++                    onChange={(e) => setFormData({ ...formData, fontFamily: e.target.value })}
++                    disabled={loading}
++                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
++                  >
++                    {STOREFRONT_FONTS.map((font) => (
++                      <option key={font.id} value={font.id}>
++                        {font.label}
++                      </option>
++                    ))}
++                  </select>
++                  <p className="text-xs text-muted-foreground">Applied across your whole storefront.</p>
++                </div>
+               </div>
+ 
+               <div className="space-y-2">
+diff --git a/lib/page-builder/block-registry.tsx b/lib/page-builder/block-registry.tsx
+index 0c3a42c..cbd6a10 100644
+--- a/lib/page-builder/block-registry.tsx
++++ b/lib/page-builder/block-registry.tsx
+@@ -1,18 +1,45 @@
+ import type { ComponentType } from "react"
+-import { LayoutTemplate, ShoppingBag, CalendarClock, Info, Phone } from "lucide-react"
+ import {
++  Megaphone,
++  Navigation,
++  LayoutTemplate,
++  TrendingUp,
++  Tags,
++  ShoppingBag,
++  CalendarClock,
++  Image as ImageIcon,
++  Info,
++  ShieldCheck,
++  PanelBottom,
++  Phone,
++} from "lucide-react"
++import {
++  announcementBarSettingsSchema,
++  navbarSettingsSchema,
+   heroSettingsSchema,
++  popularSettingsSchema,
++  categoriesSettingsSchema,
+   productGridSettingsSchema,
+   serviceGridSettingsSchema,
++  bannerSettingsSchema,
+   aboutSettingsSchema,
++  trustSettingsSchema,
++  footerSettingsSchema,
+   contactInfoSettingsSchema,
+ } from "@/lib/page-builder/block-schemas"
+ import type { BlockType, BlockSettingsMap } from "@/lib/page-builder/types"
+ import type { Business, Product, Service } from "@/components/business-layouts"
++import { AnnouncementBarBlock } from "@/components/page-builder/blocks/announcement-bar-block"
++import { NavbarBlock } from "@/components/page-builder/blocks/navbar-block"
+ import { HeroBlock } from "@/components/page-builder/blocks/hero-block"
++import { PopularBlock } from "@/components/page-builder/blocks/popular-block"
++import { CategoriesBlock } from "@/components/page-builder/blocks/categories-block"
+ import { ProductGridBlock } from "@/components/page-builder/blocks/product-grid-block"
+ import { ServiceGridBlock } from "@/components/page-builder/blocks/service-grid-block"
++import { BannerBlock } from "@/components/page-builder/blocks/banner-block"
+ import { AboutBlock } from "@/components/page-builder/blocks/about-block"
++import { TrustBlock } from "@/components/page-builder/blocks/trust-block"
++import { FooterBlock } from "@/components/page-builder/blocks/footer-block"
+ import { ContactInfoBlock } from "@/components/page-builder/blocks/contact-info-block"
+ 
+ export interface BlockRenderProps<T extends BlockType> {
+@@ -22,6 +49,12 @@ export interface BlockRenderProps<T extends BlockType> {
+   services: Service[]
+   onAddToCart: (product: Product) => void
+   onBookService: (service: Service) => void
++  /** Total items currently in the storefront cart — drives the navbar's cart badge. */
++  cartItemCount: number
++  /** Opens the cart drawer — used by the navbar's cart icon. */
++  onCartOpen: () => void
++  /** Live search text — the navbar owns the input, product/service grids use it to filter. */
++  onSearchChange: (value: string) => void
+ }
+ 
+ interface BlockDefinition<T extends BlockType> {
+@@ -32,7 +65,25 @@ interface BlockDefinition<T extends BlockType> {
+   Render: ComponentType<BlockRenderProps<T>>
+ }
+ 
++// Each block's default settings come from its zod schema's own .parse({}),
++// so the registry can never drift from the validation contract in
++// block-schemas.ts — there's only one place that defines "what a hero
++// block looks like by default."
+ export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
++  "announcement-bar": {
++    type: "announcement-bar",
++    label: "Announcement Bar",
++    icon: Megaphone,
++    defaultSettings: announcementBarSettingsSchema.parse({}),
++    Render: AnnouncementBarBlock,
++  },
++  navbar: {
++    type: "navbar",
++    label: "Navbar",
++    icon: Navigation,
++    defaultSettings: navbarSettingsSchema.parse({}),
++    Render: NavbarBlock,
++  },
+   hero: {
+     type: "hero",
+     label: "Hero",
+@@ -40,6 +91,20 @@ export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
+     defaultSettings: heroSettingsSchema.parse({}),
+     Render: HeroBlock,
+   },
++  popular: {
++    type: "popular",
++    label: "Popular / Trending",
++    icon: TrendingUp,
++    defaultSettings: popularSettingsSchema.parse({}),
++    Render: PopularBlock,
++  },
++  categories: {
++    type: "categories",
++    label: "Categories",
++    icon: Tags,
++    defaultSettings: categoriesSettingsSchema.parse({}),
++    Render: CategoriesBlock,
++  },
+   "product-grid": {
+     type: "product-grid",
+     label: "Products",
+@@ -54,13 +119,34 @@ export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
+     defaultSettings: serviceGridSettingsSchema.parse({}),
+     Render: ServiceGridBlock,
+   },
++  banner: {
++    type: "banner",
++    label: "Promotional Banner",
++    icon: ImageIcon,
++    defaultSettings: bannerSettingsSchema.parse({}),
++    Render: BannerBlock,
++  },
+   about: {
+     type: "about",
+-    label: "About",
++    label: "About / Story",
+     icon: Info,
+     defaultSettings: aboutSettingsSchema.parse({}),
+     Render: AboutBlock,
+   },
++  trust: {
++    type: "trust",
++    label: "Trust Section",
++    icon: ShieldCheck,
++    defaultSettings: trustSettingsSchema.parse({}),
++    Render: TrustBlock,
++  },
++  footer: {
++    type: "footer",
++    label: "Footer",
++    icon: PanelBottom,
++    defaultSettings: footerSettingsSchema.parse({}),
++    Render: FooterBlock,
++  },
+   "contact-info": {
+     type: "contact-info",
+     label: "Contact Info",
+@@ -70,4 +156,23 @@ export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
+   },
+ }
+ 
+-export const BLOCK_TYPES: BlockType[] = ["hero", "product-grid", "service-grid", "about", "contact-info"]
++// Matches the requested storefront structure: Announcement, Navbar, Hero,
++// Popular/Trending, Categories, Products/Services, Banner, About, Trust,
++// Footer. Contact Info stays available via Add Section for businesses
++// that want a dedicated contact page section, but isn't auto-included —
++// contact details already live in the Footer by default.
++export const BLOCK_TYPES: BlockType[] = [
++  "announcement-bar",
++  "navbar",
++  "hero",
++  "popular",
++  "categories",
++  "product-grid",
++  "service-grid",
++  "banner",
++  "about",
++  "trust",
++  "footer",
++]
++
++export const ALL_BLOCK_TYPES: BlockType[] = [...BLOCK_TYPES, "contact-info"]
+diff --git a/lib/page-builder/block-schemas.ts b/lib/page-builder/block-schemas.ts
+index 615e112..7d3524d 100644
+--- a/lib/page-builder/block-schemas.ts
++++ b/lib/page-builder/block-schemas.ts
+@@ -16,6 +16,28 @@ export const heroSettingsSchema = z.object({
+   imagePositionY: z.number().min(0).max(100).default(50),
+ })
+ 
++export const announcementBarSettingsSchema = z.object({
++  text: z.string().min(1).max(200).default("Welcome! Check out what's new."),
++  // Optional — full URL or a same-page anchor like "#storefront-products". Empty = not a link.
++  link: z.string().max(300).default(""),
++})
++
++export const navbarSettingsSchema = z.object({
++  showSearch: z.boolean().default(true),
++  showCart: z.boolean().default(true),
++})
++
++export const categoriesSettingsSchema = z.object({
++  title: z.string().max(80).default("Shop by Category"),
++})
++
++export const popularSettingsSchema = z.object({
++  title: z.string().max(80).default("Popular Right Now"),
++  productIds: z.array(z.string()).default([]),
++  serviceIds: z.array(z.string()).default([]),
++  maxItems: z.number().int().min(1).max(12).default(4),
++})
++
+ export const productGridSettingsSchema = z.object({
+   title: z.string().max(80).default("Our Products"),
+   groupByCategory: z.boolean().default(true),
+@@ -27,10 +49,33 @@ export const serviceGridSettingsSchema = z.object({
+   titleAlignment: z.enum(["left", "center", "right"]).default("center"),
+ })
+ 
++export const bannerSettingsSchema = z.object({
++  heading: z.string().max(120).default("Your next favorite find"),
++  description: z.string().max(300).default(""),
++  ctaText: z.string().max(40).default("Shop Now"),
++  ctaLink: z.string().max(300).default("#storefront-products"),
++  mediaUrl: z.string().nullable().default(null),
++  mediaType: z.enum(["image", "video"]).default("image"),
++})
++
+ export const aboutSettingsSchema = z.object({
+-  title: z.string().max(80).default("About Us"),
++  title: z.string().max(80).default("Made with intention."),
+   body: z.string().max(2000).nullable().default(null),
+-  alignment: z.enum(["left", "center", "right"]).default("center"),
++  imageUrl: z.string().nullable().default(null),
++  // Which side the image sits on — "center" hides the image and just centers the text.
++  alignment: z.enum(["left", "center", "right"]).default("left"),
++  ctaText: z.string().max(40).default(""),
++  ctaLink: z.string().max(300).default("#storefront-contact"),
++})
++
++export const trustSettingsSchema = z.object({
++  // Empty means the render component fills in sensible defaults based on
++  // whether the business sells products, services, or both.
++  items: z.array(z.string().max(60)).max(4).default([]),
++})
++
++export const footerSettingsSchema = z.object({
++  showSocials: z.boolean().default(true),
+ })
+ 
+ export const contactInfoSettingsSchema = z.object({
+@@ -44,10 +89,17 @@ export const contactInfoSettingsSchema = z.object({
+ })
+ 
+ export const blockSettingsSchemas = {
++  "announcement-bar": announcementBarSettingsSchema,
++  navbar: navbarSettingsSchema,
+   hero: heroSettingsSchema,
++  popular: popularSettingsSchema,
++  categories: categoriesSettingsSchema,
+   "product-grid": productGridSettingsSchema,
+   "service-grid": serviceGridSettingsSchema,
++  banner: bannerSettingsSchema,
+   about: aboutSettingsSchema,
++  trust: trustSettingsSchema,
++  footer: footerSettingsSchema,
+   "contact-info": contactInfoSettingsSchema,
+ } as const
+ 
+@@ -57,10 +109,17 @@ const blockBaseSchema = z.object({
+ })
+ 
+ export const blockSchema = z.discriminatedUnion("type", [
++  blockBaseSchema.extend({ type: z.literal("announcement-bar"), settings: announcementBarSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("navbar"), settings: navbarSettingsSchema }),
+   blockBaseSchema.extend({ type: z.literal("hero"), settings: heroSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("popular"), settings: popularSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("categories"), settings: categoriesSettingsSchema }),
+   blockBaseSchema.extend({ type: z.literal("product-grid"), settings: productGridSettingsSchema }),
+   blockBaseSchema.extend({ type: z.literal("service-grid"), settings: serviceGridSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("banner"), settings: bannerSettingsSchema }),
+   blockBaseSchema.extend({ type: z.literal("about"), settings: aboutSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("trust"), settings: trustSettingsSchema }),
++  blockBaseSchema.extend({ type: z.literal("footer"), settings: footerSettingsSchema }),
+   blockBaseSchema.extend({ type: z.literal("contact-info"), settings: contactInfoSettingsSchema }),
+ ])
+ 
+diff --git a/lib/page-builder/types.ts b/lib/page-builder/types.ts
+index 3c7d83c..c02ef8a 100644
+--- a/lib/page-builder/types.ts
++++ b/lib/page-builder/types.ts
+@@ -1,19 +1,45 @@
+ import type { z } from "zod"
+ import type {
+   heroSettingsSchema,
++  announcementBarSettingsSchema,
++  navbarSettingsSchema,
++  popularSettingsSchema,
++  categoriesSettingsSchema,
+   productGridSettingsSchema,
+   serviceGridSettingsSchema,
++  bannerSettingsSchema,
+   aboutSettingsSchema,
++  trustSettingsSchema,
++  footerSettingsSchema,
+   contactInfoSettingsSchema,
+ } from "@/lib/page-builder/block-schemas"
+ 
+-export type BlockType = "hero" | "product-grid" | "service-grid" | "about" | "contact-info"
++export type BlockType =
++  | "announcement-bar"
++  | "navbar"
++  | "hero"
++  | "popular"
++  | "categories"
++  | "product-grid"
++  | "service-grid"
++  | "banner"
++  | "about"
++  | "trust"
++  | "footer"
++  | "contact-info"
+ 
+ export type BlockSettingsMap = {
++  "announcement-bar": z.infer<typeof announcementBarSettingsSchema>
++  navbar: z.infer<typeof navbarSettingsSchema>
+   hero: z.infer<typeof heroSettingsSchema>
++  popular: z.infer<typeof popularSettingsSchema>
++  categories: z.infer<typeof categoriesSettingsSchema>
+   "product-grid": z.infer<typeof productGridSettingsSchema>
+   "service-grid": z.infer<typeof serviceGridSettingsSchema>
++  banner: z.infer<typeof bannerSettingsSchema>
+   about: z.infer<typeof aboutSettingsSchema>
++  trust: z.infer<typeof trustSettingsSchema>
++  footer: z.infer<typeof footerSettingsSchema>
+   "contact-info": z.infer<typeof contactInfoSettingsSchema>
+ }
+ 
+diff --git a/lib/storefront-fonts.ts b/lib/storefront-fonts.ts
 new file mode 100644
-index 0000000..a7e5ffe
+index 0000000..33aff8a
 --- /dev/null
-+++ b/lib/product-categories.ts
-@@ -0,0 +1,65 @@
-+export const UNCATEGORIZED_LABEL = "Other"
-+
-+export interface CategorizedItem {
-+  category: string | null
++++ b/lib/storefront-fonts.ts
+@@ -0,0 +1,61 @@
++export interface StorefrontFont {
++  id: string
++  label: string
++  /** Google Fonts family name to load, or null for a system-font-only stack. */
++  googleFont: string | null
++  /** CSS font-family stack, with sensible fallbacks per style. */
++  stack: string
 +}
 +
-+export interface ProductCategoryGroup<T> {
-+  category: string
-+  items: T[]
++// A curated set rather than free text — an open font-name field risks
++// broken or unsafe values reaching page_schema. Each entry pairs a
++// Google Font with a same-vibe system fallback stack.
++export const STOREFRONT_FONTS: StorefrontFont[] = [
++  {
++    id: "inter",
++    label: "Inter (Default)",
++    googleFont: null,
++    stack: "Inter, ui-sans-serif, system-ui, sans-serif",
++  },
++  {
++    id: "poppins",
++    label: "Poppins — Modern & Friendly",
++    googleFont: "Poppins:wght@400;500;600;700",
++    stack: "'Poppins', ui-sans-serif, system-ui, sans-serif",
++  },
++  {
++    id: "playfair",
++    label: "Playfair Display — Elegant & Editorial",
++    googleFont: "Playfair+Display:wght@400;600;700",
++    stack: "'Playfair Display', ui-serif, Georgia, serif",
++  },
++  {
++    id: "space-grotesk",
++    label: "Space Grotesk — Bold & Contemporary",
++    googleFont: "Space+Grotesk:wght@400;500;700",
++    stack: "'Space Grotesk', ui-sans-serif, system-ui, sans-serif",
++  },
++  {
++    id: "dm-serif",
++    label: "DM Serif Display — Refined & Classic",
++    googleFont: "DM+Serif+Display",
++    stack: "'DM Serif Display', ui-serif, Georgia, serif",
++  },
++]
++
++const FONT_MAP = new Map(STOREFRONT_FONTS.map((f) => [f.id, f]))
++
++export function getStorefrontFont(fontId?: string | null): StorefrontFont {
++  return (fontId && FONT_MAP.get(fontId)) || STOREFRONT_FONTS[0]
 +}
 +
-+/**
-+ * Groups a list of products (or services) by their `category` field.
-+ * Items with no category (null/empty/whitespace) are bucketed under
-+ * UNCATEGORIZED_LABEL, which always sorts last. Named categories sort
-+ * alphabetically. Used by both the Inventory page and the storefront
-+ * layouts so grouping stays consistent everywhere.
-+ */
-+export function groupByCategory<T extends CategorizedItem>(items: T[]): ProductCategoryGroup<T>[] {
-+  const groups = new Map<string, T[]>()
-+
-+  for (const item of items) {
-+    const raw = item.category?.trim()
-+    const key = raw && raw.length > 0 ? raw : UNCATEGORIZED_LABEL
-+    const existing = groups.get(key)
-+    if (existing) {
-+      existing.push(item)
-+    } else {
-+      groups.set(key, [item])
-+    }
-+  }
-+
-+  return Array.from(groups.entries())
-+    .sort(([a], [b]) => {
-+      if (a === UNCATEGORIZED_LABEL) return 1
-+      if (b === UNCATEGORIZED_LABEL) return -1
-+      return a.localeCompare(b)
-+    })
-+    .map(([category, items]) => ({ category, items }))
++export function getFontStack(fontId?: string | null): string {
++  return getStorefrontFont(fontId).stack
 +}
 +
-+/** Distinct, sorted list of categories currently in use — for autocomplete. */
-+export function distinctCategories<T extends CategorizedItem>(items: T[]): string[] {
-+  const set = new Set<string>()
-+  for (const item of items) {
-+    const raw = item.category?.trim()
-+    if (raw) set.add(raw)
-+  }
-+  return Array.from(set).sort((a, b) => a.localeCompare(b))
++/** Google Fonts CSS2 URL for the given font, or null when no external font needs loading. */
++export function getGoogleFontUrl(fontId?: string | null): string | null {
++  const font = getStorefrontFont(fontId)
++  if (!font.googleFont) return null
++  return `https://fonts.googleapis.com/css2?family=${font.googleFont}&display=swap`
 +}
+diff --git a/scripts/018-storefront-font.sql b/scripts/018-storefront-font.sql
+new file mode 100644
+index 0000000..56e2671
+--- /dev/null
++++ b/scripts/018-storefront-font.sql
+@@ -0,0 +1,14 @@
++-- ============================================================
++-- Migration 018: Storefront font selection
++-- ============================================================
++-- Adds font_family to businesses, mirroring how accent_color already
++-- works: a single column, applied by the block renderer, edited from
++-- Settings. Deliberately a free-text column rather than a Postgres enum
++-- (matches this project's existing convention — see subscription_plan,
++-- subscription_status — of TEXT + application-level validation instead
++-- of DB-level enums, which are more rigid to extend later). The actual
++-- set of allowed values is enforced in code (lib/storefront-fonts.ts),
++-- not the database — same trust boundary as accent_color, which is also
++-- free text validated client-side.
 +
-+export type StockStatus = "not-tracked" | "in-stock" | "low" | "out"
-+
-+export function getStockStatus(product: {
-+  track_inventory: boolean
-+  stock_quantity: number | null
-+  low_stock_threshold: number | null
-+}): StockStatus {
-+  if (!product.track_inventory || product.stock_quantity === null || product.stock_quantity === undefined) {
-+    return "not-tracked"
-+  }
-+  if (product.stock_quantity <= 0) return "out"
-+  if (product.stock_quantity <= (product.low_stock_threshold ?? 5)) return "low"
-+  return "in-stock"
-+}
++ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'inter';

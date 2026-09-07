@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Sparkles, ArrowLeft, AlertCircle, CheckCircle, CheckCircle2 } from "lucide-react"
+import { Sparkles, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
-import { LAYOUT_CONFIGS, type LayoutStyle } from "@/lib/layouts"
+import { type LayoutStyle } from "@/lib/layouts"
+import { STOREFRONT_FONTS } from "@/lib/storefront-fonts"
 
 interface Business {
   id: string
@@ -30,6 +31,7 @@ interface Business {
   layout_style?: LayoutStyle
   accent_color?: string | null
   dark_mode_enabled?: boolean
+  font_family?: string | null
 }
 
 interface SettingsContentProps {
@@ -53,6 +55,7 @@ export function SettingsContent({ business }: SettingsContentProps) {
     instagramHandle: business.instagram_handle || "",
     layoutStyle: business.layout_style || "classic-card" as LayoutStyle,
     darkModeEnabled: business.dark_mode_enabled || false,
+    fontFamily: business.font_family || "inter",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,6 +79,7 @@ export function SettingsContent({ business }: SettingsContentProps) {
           accent_color: formData.accentColor,
           layout_style: formData.layoutStyle,
           dark_mode_enabled: formData.darkModeEnabled,
+          font_family: formData.fontFamily,
           whatsapp_number: formData.whatsappNumber || null,
           instagram_handle: formData.instagramHandle || null,
         })
@@ -243,31 +247,13 @@ export function SettingsContent({ business }: SettingsContentProps) {
               <CardDescription>Customize how your business page looks</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label>Layout Style</Label>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {LAYOUT_CONFIGS.map((layout) => (
-                    <div
-                      key={layout.id}
-                      className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
-                        formData.layoutStyle === layout.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      onClick={() => setFormData({ ...formData, layoutStyle: layout.id })}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className={`w-8 h-8 rounded ${layout.previewColor} flex-shrink-0`}></div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{layout.name}</div>
-                          {formData.layoutStyle === layout.id && (
-                            <CheckCircle2 className="h-4 w-4 text-primary mt-1" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                Your storefront's layout and sections are now customized from{" "}
+                <Link href="/dashboard/design" className="font-medium text-primary hover:underline">
+                  Design
+                </Link>{" "}
+                — add, remove, and reorder sections there. The settings below still control your brand colors and
+                font everywhere on your page.
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -310,6 +296,23 @@ export function SettingsContent({ business }: SettingsContentProps) {
                       className="flex-1 font-mono text-sm"
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fontFamily">Storefront Font</Label>
+                  <select
+                    id="fontFamily"
+                    value={formData.fontFamily}
+                    onChange={(e) => setFormData({ ...formData, fontFamily: e.target.value })}
+                    disabled={loading}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {STOREFRONT_FONTS.map((font) => (
+                      <option key={font.id} value={font.id}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">Applied across your whole storefront.</p>
                 </div>
               </div>
 

@@ -29,7 +29,7 @@ export function ProductGridBlock({ products, settings, onAddToCart }: BlockRende
   }
 
   return (
-    <section className="container mx-auto px-4 py-12">
+    <section id="storefront-products" className="container mx-auto px-4 py-12">
       <h2 className={`mb-10 text-3xl font-bold ${alignmentClass[settings.titleAlignment]}`}>{settings.title}</h2>
       {products.length === 0 ? (
         <div className="py-12 text-center">

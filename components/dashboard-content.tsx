@@ -51,6 +51,7 @@ export interface Business {
   /** Working copy the design builder edits; not visible to customers until published. */
   page_schema_draft?: import("@/lib/page-builder/types").PageSchema | null
   page_schema_updated_at?: string | null
+  font_family?: string | null
 }
 
 export interface Product {
