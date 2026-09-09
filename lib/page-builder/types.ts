@@ -7,6 +7,7 @@ import type {
   categoriesSettingsSchema,
   productGridSettingsSchema,
   serviceGridSettingsSchema,
+  newArrivalsSettingsSchema,
   bannerSettingsSchema,
   aboutSettingsSchema,
   trustSettingsSchema,
@@ -22,6 +23,7 @@ export type BlockType =
   | "categories"
   | "product-grid"
   | "service-grid"
+  | "new-arrivals"
   | "banner"
   | "about"
   | "trust"
@@ -36,6 +38,7 @@ export type BlockSettingsMap = {
   categories: z.infer<typeof categoriesSettingsSchema>
   "product-grid": z.infer<typeof productGridSettingsSchema>
   "service-grid": z.infer<typeof serviceGridSettingsSchema>
+  "new-arrivals": z.infer<typeof newArrivalsSettingsSchema>
   banner: z.infer<typeof bannerSettingsSchema>
   about: z.infer<typeof aboutSettingsSchema>
   trust: z.infer<typeof trustSettingsSchema>

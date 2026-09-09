@@ -65,6 +65,7 @@ export interface Product {
   stock_quantity: number | null
   track_inventory: boolean
   low_stock_threshold: number | null
+  has_variants?: boolean
 }
 
 export interface Service {

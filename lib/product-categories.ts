@@ -63,3 +63,43 @@ export function getStockStatus(product: {
   if (product.stock_quantity <= (product.low_stock_threshold ?? 5)) return "low"
   return "in-stock"
 }
+
+export interface ProductVariant {
+  id: string
+  size: string | null
+  color: string | null
+  stock_quantity: number
+  low_stock_threshold: number | null
+}
+
+/** Same low/out/in-stock logic as `getStockStatus`, applied to one variant row. */
+export function getVariantStockStatus(
+  variant: Pick<ProductVariant, "stock_quantity" | "low_stock_threshold">,
+  productLowStockThreshold: number | null,
+): Exclude<StockStatus, "not-tracked"> {
+  if (variant.stock_quantity <= 0) return "out"
+  const threshold = variant.low_stock_threshold ?? productLowStockThreshold ?? 5
+  if (variant.stock_quantity <= threshold) return "low"
+  return "in-stock"
+}
+
+/**
+ * Rolls up every variant's status into one badge for a product card: "out"
+ * only when every variant is out, "low" when any variant is low or out
+ * (there's still something to warn about), "in-stock" otherwise.
+ */
+export function getProductStockSummary(
+  variants: ProductVariant[],
+  productLowStockThreshold: number | null,
+): StockStatus {
+  if (variants.length === 0) return "not-tracked"
+  const statuses = variants.map((v) => getVariantStockStatus(v, productLowStockThreshold))
+  if (statuses.every((s) => s === "out")) return "out"
+  if (statuses.some((s) => s === "out" || s === "low")) return "low"
+  return "in-stock"
+}
+
+/** A short "White / Large" style label for a variant, for cart lines and pickers. */
+export function variantLabel(variant: { size?: string | null; color?: string | null }): string {
+  return [variant.color, variant.size].filter(Boolean).join(" / ")
+}

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { ImagePlus, Loader2, Trash2, Plus, X, Search } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
-import { blockSettingsSchemas } from "@/lib/page-builder/block-schemas"
+import { blockSettingsSchemas, TEXT_LIMITS, countWords } from "@/lib/page-builder/block-schemas"
 import type { Block, BlockSettingsMap } from "@/lib/page-builder/types"
 import type { Product, Service } from "@/components/dashboard-content"
 import { AlignmentControl } from "./alignment-control"
@@ -55,6 +55,25 @@ function ToggleField({
   )
 }
 
+function CharCount({ value, max }: { value: string; max: number }) {
+  const over = value.length >= max
+  return (
+    <p className={cn("text-right text-[11px]", over ? "text-destructive" : "text-muted-foreground")}>
+      {value.length}/{max}
+    </p>
+  )
+}
+
+function WordCount({ value, max, label }: { value: string; max: number; label: string }) {
+  const count = countWords(value)
+  const over = count > max
+  return (
+    <p className={cn("text-right text-[11px]", over ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+      {count}/{max} words {over ? `— consider trimming your ${label}` : ""}
+    </p>
+  )
+}
+
 function AlignmentSelect({
   value,
   onChange,
@@ -76,16 +95,42 @@ function AlignmentSelect({
   )
 }
 
+/** Reads a File's pixel dimensions by decoding it in a throwaway <img>. */
+function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error("Could not read image dimensions."))
+    }
+    img.src = url
+  })
+}
+
 function ImageField({
   label = "Image",
   value,
   businessId,
   onChange,
+  maxWidth = 3000,
+  maxHeight = 3000,
+  maxSizeMB = 5,
 }: {
   label?: string
   value: string | null
   businessId: string
   onChange: (value: string | null) => void
+  /** Different sections reasonably allow different sizes — a hero background
+   *  can be much larger than an inline About-Us image — so callers pass
+   *  their own caps instead of one global constant. */
+  maxWidth?: number
+  maxHeight?: number
+  maxSizeMB?: number
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -96,8 +141,18 @@ function ImageField({
       setError("Please choose an image file.")
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be 5MB or smaller.")
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setError(`Image must be ${maxSizeMB}MB or smaller.`)
+      return
+    }
+    try {
+      const { width, height } = await readImageDimensions(file)
+      if (width > maxWidth || height > maxHeight) {
+        setError(`Image is ${width}×${height}px — please use ${maxWidth}×${maxHeight}px or smaller.`)
+        return
+      }
+    } catch {
+      setError("That file doesn't look like a valid image.")
       return
     }
 
@@ -165,18 +220,35 @@ function ImageField({
           event.target.value = ""
         }}
       />
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Up to {maxWidth}×{maxHeight}px, {maxSizeMB}MB.
+        </p>
+      )}
     </div>
   )
 }
 
-function ListField({ items, onChange, max = 4 }: { items: string[]; onChange: (items: string[]) => void; max?: number }) {
+function ListField({
+  items,
+  onChange,
+  max = 4,
+  maxItemLength,
+}: {
+  items: string[]
+  onChange: (items: string[]) => void
+  max?: number
+  maxItemLength?: number
+}) {
   return (
     <div className="space-y-2">
       {items.map((item, i) => (
         <div key={i} className="flex gap-2">
           <Input
             value={item}
+            maxLength={maxItemLength}
             onChange={(e) => {
               const next = [...items]
               next[i] = e.target.value
@@ -210,15 +282,36 @@ function HeroInspector({
     <div className="space-y-5">
       <div className="space-y-2">
         <FieldLabel>Heading</FieldLabel>
-        <Input value={settings.heading} placeholder="Uses business name by default" onChange={(e) => onChange({ ...settings, heading: e.target.value })} />
+        <Input
+          value={settings.heading}
+          placeholder="Uses business name by default"
+          maxLength={TEXT_LIMITS.hero.heading.chars}
+          onChange={(e) => onChange({ ...settings, heading: e.target.value })}
+        />
+        <CharCount value={settings.heading} max={TEXT_LIMITS.hero.heading.chars} />
+        <WordCount value={settings.heading} max={TEXT_LIMITS.hero.heading.words} label="heading" />
       </div>
       <div className="space-y-2">
         <FieldLabel>Description</FieldLabel>
-        <Textarea value={settings.description} placeholder="Uses business description by default" rows={4} onChange={(e) => onChange({ ...settings, description: e.target.value })} />
+        <Textarea
+          value={settings.description}
+          placeholder="Uses business description by default"
+          rows={4}
+          maxLength={TEXT_LIMITS.hero.description.chars}
+          onChange={(e) => onChange({ ...settings, description: e.target.value })}
+        />
+        <CharCount value={settings.description} max={TEXT_LIMITS.hero.description.chars} />
       </div>
       <ToggleField label="Show logo" value={settings.showLogo} onChange={(showLogo) => onChange({ ...settings, showLogo })} />
       <ToggleField label="Show description" value={settings.showDescription} onChange={(showDescription) => onChange({ ...settings, showDescription })} />
-      <ImageField value={settings.heroImageUrl} businessId={businessId} onChange={(heroImageUrl) => onChange({ ...settings, heroImageUrl })} />
+      <ImageField
+        value={settings.heroImageUrl}
+        businessId={businessId}
+        maxWidth={2400}
+        maxHeight={1600}
+        maxSizeMB={5}
+        onChange={(heroImageUrl) => onChange({ ...settings, heroImageUrl })}
+      />
       <AlignmentControl
         value={settings.contentAlignment}
         vertical={settings.contentVerticalAlignment}
@@ -347,7 +440,12 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Text</FieldLabel>
-            <Input value={block.settings.text} onChange={(e) => update({ ...block.settings, text: e.target.value })} />
+            <Input
+              value={block.settings.text}
+              maxLength={TEXT_LIMITS.announcementBar.text.chars}
+              onChange={(e) => update({ ...block.settings, text: e.target.value })}
+            />
+            <CharCount value={block.settings.text} max={TEXT_LIMITS.announcementBar.text.chars} />
           </div>
           <div className="space-y-2">
             <FieldLabel>Link (optional)</FieldLabel>
@@ -380,7 +478,12 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Section title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.popular.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.popular.title.chars} />
           </div>
           <ItemPicker
             products={products}
@@ -408,6 +511,10 @@ export function SettingsInspector({ block, businessId, products, services, onCha
               }}
             />
           </div>
+          <div className="space-y-2">
+            <FieldLabel>Title alignment</FieldLabel>
+            <AlignmentSelect value={block.settings.titleAlignment} onChange={(titleAlignment) => update({ ...block.settings, titleAlignment })} />
+          </div>
         </div>
       )
 
@@ -416,7 +523,16 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Section title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.categories.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.categories.title.chars} />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Title alignment</FieldLabel>
+            <AlignmentSelect value={block.settings.titleAlignment} onChange={(titleAlignment) => update({ ...block.settings, titleAlignment })} />
           </div>
           <p className="text-xs text-muted-foreground">
             Categories are pulled automatically from your products and services — add a category to an item to have
@@ -430,7 +546,12 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Section title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.productGrid.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.productGrid.title.chars} />
           </div>
           <ToggleField label="Group products by category" value={block.settings.groupByCategory} onChange={(groupByCategory) => update({ ...block.settings, groupByCategory })} />
           <div className="space-y-2">
@@ -445,7 +566,41 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Section title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.serviceGrid.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.serviceGrid.title.chars} />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Title alignment</FieldLabel>
+            <AlignmentSelect value={block.settings.titleAlignment} onChange={(titleAlignment) => update({ ...block.settings, titleAlignment })} />
+          </div>
+        </div>
+      )
+
+    case "new-arrivals":
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <FieldLabel>Section title</FieldLabel>
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.newArrivals.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.newArrivals.title.chars} />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Products to show</FieldLabel>
+            <Input
+              type="number"
+              min={1}
+              max={24}
+              value={block.settings.limit}
+              onChange={(e) => update({ ...block.settings, limit: Math.min(24, Math.max(1, Number(e.target.value) || 1)) })}
+            />
           </div>
           <div className="space-y-2">
             <FieldLabel>Title alignment</FieldLabel>
@@ -459,16 +614,32 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Heading</FieldLabel>
-            <Input value={block.settings.heading} onChange={(e) => update({ ...block.settings, heading: e.target.value })} />
+            <Input
+              value={block.settings.heading}
+              maxLength={TEXT_LIMITS.banner.heading.chars}
+              onChange={(e) => update({ ...block.settings, heading: e.target.value })}
+            />
+            <CharCount value={block.settings.heading} max={TEXT_LIMITS.banner.heading.chars} />
           </div>
           <div className="space-y-2">
             <FieldLabel>Description</FieldLabel>
-            <Textarea value={block.settings.description} rows={3} onChange={(e) => update({ ...block.settings, description: e.target.value })} />
+            <Textarea
+              value={block.settings.description}
+              rows={3}
+              maxLength={TEXT_LIMITS.banner.description.chars}
+              onChange={(e) => update({ ...block.settings, description: e.target.value })}
+            />
+            <CharCount value={block.settings.description} max={TEXT_LIMITS.banner.description.chars} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <FieldLabel>Button text</FieldLabel>
-              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
+              <Input
+                value={block.settings.ctaText}
+                maxLength={TEXT_LIMITS.banner.ctaText.chars}
+                onChange={(e) => update({ ...block.settings, ctaText: e.target.value })}
+              />
+              <CharCount value={block.settings.ctaText} max={TEXT_LIMITS.banner.ctaText.chars} />
             </div>
             <div className="space-y-2">
               <FieldLabel>Button link</FieldLabel>
@@ -488,7 +659,15 @@ export function SettingsInspector({ block, businessId, products, services, onCha
             </Select>
           </div>
           {block.settings.mediaType === "image" ? (
-            <ImageField label="Banner image" value={block.settings.mediaUrl} businessId={businessId} onChange={(mediaUrl) => update({ ...block.settings, mediaUrl })} />
+            <ImageField
+              label="Banner image"
+              value={block.settings.mediaUrl}
+              businessId={businessId}
+              maxWidth={2400}
+              maxHeight={1600}
+              maxSizeMB={5}
+              onChange={(mediaUrl) => update({ ...block.settings, mediaUrl })}
+            />
           ) : (
             <div className="space-y-2">
               <FieldLabel>Video URL (.mp4)</FieldLabel>
@@ -508,13 +687,34 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.about.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.about.title.chars} />
           </div>
           <div className="space-y-2">
             <FieldLabel>Body</FieldLabel>
-            <Textarea value={block.settings.body ?? ""} rows={6} placeholder="Uses business description by default" onChange={(e) => update({ ...block.settings, body: e.target.value || null })} />
+            <Textarea
+              value={block.settings.body ?? ""}
+              rows={6}
+              placeholder="Uses business description by default"
+              maxLength={TEXT_LIMITS.about.body.chars}
+              onChange={(e) => update({ ...block.settings, body: e.target.value || null })}
+            />
+            <CharCount value={block.settings.body ?? ""} max={TEXT_LIMITS.about.body.chars} />
+            <WordCount value={block.settings.body ?? ""} max={TEXT_LIMITS.about.body.words} label="story" />
           </div>
-          <ImageField label="Story image" value={block.settings.imageUrl} businessId={businessId} onChange={(imageUrl) => update({ ...block.settings, imageUrl })} />
+          <ImageField
+            label="Story image"
+            value={block.settings.imageUrl}
+            businessId={businessId}
+            maxWidth={1600}
+            maxHeight={1600}
+            maxSizeMB={3}
+            onChange={(imageUrl) => update({ ...block.settings, imageUrl })}
+          />
           <div className="space-y-2">
             <FieldLabel>Image position</FieldLabel>
             <Select value={block.settings.alignment} onValueChange={(v) => update({ ...block.settings, alignment: v as "left" | "center" | "right" })}>
@@ -531,7 +731,12 @@ export function SettingsInspector({ block, businessId, products, services, onCha
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <FieldLabel>Button text (optional)</FieldLabel>
-              <Input value={block.settings.ctaText} onChange={(e) => update({ ...block.settings, ctaText: e.target.value })} />
+              <Input
+                value={block.settings.ctaText}
+                maxLength={TEXT_LIMITS.about.ctaText.chars}
+                onChange={(e) => update({ ...block.settings, ctaText: e.target.value })}
+              />
+              <CharCount value={block.settings.ctaText} max={TEXT_LIMITS.about.ctaText.chars} />
             </div>
             <div className="space-y-2">
               <FieldLabel>Button link</FieldLabel>
@@ -544,8 +749,8 @@ export function SettingsInspector({ block, businessId, products, services, onCha
     case "trust":
       return (
         <div className="space-y-5">
-          <p className="text-xs text-muted-foreground">Leave empty to use sensible defaults for your business type.</p>
-          <ListField items={block.settings.items} onChange={(items) => update({ ...block.settings, items })} />
+          <p className="text-xs text-muted-foreground">Leave empty to use sensible defaults for your business type. Each item: {TEXT_LIMITS.trust.item.chars} characters max.</p>
+          <ListField items={block.settings.items} max={4} maxItemLength={TEXT_LIMITS.trust.item.chars} onChange={(items) => update({ ...block.settings, items })} />
         </div>
       )
 
@@ -565,7 +770,12 @@ export function SettingsInspector({ block, businessId, products, services, onCha
         <div className="space-y-5">
           <div className="space-y-2">
             <FieldLabel>Title</FieldLabel>
-            <Input value={block.settings.title} onChange={(e) => update({ ...block.settings, title: e.target.value })} />
+            <Input
+              value={block.settings.title}
+              maxLength={TEXT_LIMITS.contactInfo.title.chars}
+              onChange={(e) => update({ ...block.settings, title: e.target.value })}
+            />
+            <CharCount value={block.settings.title} max={TEXT_LIMITS.contactInfo.title.chars} />
           </div>
           {(
             [

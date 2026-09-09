@@ -19,6 +19,7 @@ import type { LayoutStyle } from "@/lib/layouts"
 
 export interface Business {
   id: string
+  slug: string
   business_name: string
   business_type: string
   business_type_mode?: string
@@ -85,13 +86,13 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
     syncCart()
   }
 
-  const changeQuantity = (productId: string, quantity: number) => {
-    updateStoreCartQuantity(business.id, productId, quantity)
+  const changeQuantity = (productId: string, quantity: number, variantId: string | null = null) => {
+    updateStoreCartQuantity(business.id, productId, quantity, variantId)
     syncCart()
   }
 
-  const removeProduct = (productId: string) => {
-    removeFromStoreCart(business.id, productId)
+  const removeProduct = (productId: string, variantId: string | null = null) => {
+    removeFromStoreCart(business.id, productId, variantId)
     syncCart()
   }
 

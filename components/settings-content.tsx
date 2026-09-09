@@ -258,26 +258,6 @@ export function SettingsContent({ business }: SettingsContentProps) {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="themeColor">Theme Color</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="themeColor"
-                      type="color"
-                      value={formData.themeColor}
-                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
-                      disabled={loading}
-                      className="w-16 h-10"
-                    />
-                    <Input
-                      type="text"
-                      value={formData.themeColor}
-                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
-                      disabled={loading}
-                      className="flex-1 font-mono text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="accentColor">Accent Color</Label>
                   <div className="flex items-center gap-2">
                     <Input
@@ -296,6 +276,9 @@ export function SettingsContent({ business }: SettingsContentProps) {
                       className="flex-1 font-mono text-sm"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Applied to buttons, links, and highlights across your storefront.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="fontFamily">Storefront Font</Label>

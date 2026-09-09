@@ -4,7 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ShoppingCart, Check, CalendarDays, TrendingUp } from "lucide-react"
+import { ShoppingCart, Check, CalendarDays } from "lucide-react"
+import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 import type { Product, Service } from "@/components/business-layouts"
 
@@ -14,6 +15,12 @@ function money(n: number) {
 }
 
 type Entry = ({ kind: "product" } & Product) | ({ kind: "service" } & Service)
+
+const headerLayoutClass = {
+  left: "sm:flex-row sm:items-center sm:justify-between text-left",
+  center: "sm:flex-col sm:items-center text-center",
+  right: "sm:flex-row sm:items-center sm:justify-end text-right",
+} as const
 
 export function PopularBlock({ business, products, services, settings, onAddToCart, onBookService }: BlockRenderProps<"popular">) {
   const [addedId, setAddedId] = useState<string | null>(null)
@@ -37,28 +44,34 @@ export function PopularBlock({ business, products, services, settings, onAddToCa
 
   if (entries.length === 0) return null
 
-  const viewAllHref = entries.some((e) => e.kind === "product") ? "#storefront-products" : "#storefront-services"
+  const viewAllHref = entries.some((e) => e.kind === "product") ? `/${business.slug}/products` : `/${business.slug}/services`
+  const alignment = settings.titleAlignment ?? "left"
+  const buttonTextColor = getContrastTextColor(accentColor)
 
   return (
     <section className="container mx-auto px-4 py-12">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <h2 className="flex items-center gap-2 text-3xl font-bold">
-          <TrendingUp className="h-6 w-6" style={{ color: accentColor }} /> {settings.title}
-        </h2>
-        <Link href={viewAllHref} className="shrink-0 text-sm font-medium hover:underline" style={{ color: accentColor }}>
-          View all
-        </Link>
+      <div className={`mb-8 flex flex-col gap-4 ${headerLayoutClass[alignment]}`}>
+        <h2 className="text-4xl font-bold tracking-tight">{settings.title}</h2>
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="w-fit shrink-0 rounded-full border-2 font-semibold"
+          style={{ borderColor: accentColor, color: accentColor }}
+        >
+          <Link href={viewAllHref}>View all</Link>
+        </Button>
       </div>
 
       <div className="grid snap-x grid-flow-col grid-rows-1 gap-6 overflow-x-auto pb-2 sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
         {entries.map((entry) => (
           <Card
             key={`${entry.kind}-${entry.id}`}
-            className="w-[70vw] shrink-0 snap-start overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-auto"
+            className="w-[70vw] shrink-0 snap-start overflow-hidden border-border/60 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-auto"
           >
             {entry.image_url && (
-              <div className="aspect-square overflow-hidden bg-muted">
-                <img src={entry.image_url} alt={entry.name} className="h-full w-full object-cover" />
+              <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
+                <img src={entry.image_url} alt={entry.name} className="h-full w-full object-contain" />
               </div>
             )}
             <CardContent className="p-4">
@@ -68,7 +81,7 @@ export function PopularBlock({ business, products, services, settings, onAddToCa
                 {entry.kind === "product" ? (
                   <Button
                     size="sm"
-                    style={{ backgroundColor: accentColor }}
+                    style={{ backgroundColor: accentColor, color: buttonTextColor }}
                     onClick={() => {
                       onAddToCart(entry)
                       setAddedId(entry.id)
@@ -78,7 +91,7 @@ export function PopularBlock({ business, products, services, settings, onAddToCa
                     {addedId === entry.id ? <Check className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                   </Button>
                 ) : (
-                  <Button size="sm" style={{ backgroundColor: accentColor }} onClick={() => onBookService(entry)}>
+                  <Button size="sm" style={{ backgroundColor: accentColor, color: buttonTextColor }} onClick={() => onBookService(entry)}>
                     <CalendarDays className="h-4 w-4" />
                   </Button>
                 )}

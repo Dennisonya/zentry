@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"/Users/dennisonya/Projects/zentry/app/[businessname]/products/[productId]\" \"/Users/dennisonya/Projects/zentry/app/[businessname]/services\")"
+    ],
+    "additionalDirectories": [
+      "/Users/dennisonya/Projects/zentry/app/[businessname]/products"
+    ]
+  }
+}

@@ -15,6 +15,7 @@ const BLOCK_DESCRIPTIONS: Record<BlockType, string> = {
   categories: "Scrollable category pills, pulled from your products/services.",
   "product-grid": "Your products, optionally grouped by category.",
   "service-grid": "Your bookable services.",
+  "new-arrivals": "Your most recently added products, newest first.",
   banner: "A large promotional banner — photo or MP4 video background.",
   about: "Your story, with an optional side image and call-to-action button.",
   trust: "A short row of trust signals — secure checkout, fast delivery, etc.",

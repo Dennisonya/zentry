@@ -12,6 +12,7 @@ import type { LayoutStyle } from "@/lib/layouts"
 
 export interface Business {
   id: string
+  slug: string
   business_name: string
   business_type: string
   business_type_mode?: string
@@ -35,6 +36,8 @@ export interface Product {
   price: number
   image_url: string | null
   category: string | null
+  created_at?: string | null
+  has_variants?: boolean
 }
 
 export interface Service {

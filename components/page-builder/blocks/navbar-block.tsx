@@ -6,6 +6,7 @@ import { Search, Heart, ShoppingBag, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 
 interface NavLink {
@@ -81,7 +82,7 @@ export function NavbarBlock({
                 <Search className="h-[18px] w-[18px]" />
               </Button>
               {searchOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border bg-background p-3 shadow-lg">
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,90vw)] rounded-xl border bg-background p-3 shadow-lg">
                   <Input
                     autoFocus
                     placeholder="Search products & services..."
@@ -105,8 +106,8 @@ export function NavbarBlock({
               <ShoppingBag className="h-[18px] w-[18px]" />
               {cartItemCount > 0 && (
                 <span
-                  className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: accentColor }}
+                  className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold"
+                  style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }}
                 >
                   {cartItemCount > 9 ? "9+" : cartItemCount}
                 </span>

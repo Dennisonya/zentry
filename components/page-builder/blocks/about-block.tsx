@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
+import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 
 export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
@@ -29,7 +30,7 @@ export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl">{settings.title}</h2>
           <p className="mt-4 whitespace-pre-line text-base leading-7 text-muted-foreground">{body}</p>
           {settings.ctaText && (
-            <Button asChild className="mt-6 text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>
+            <Button asChild className="mt-6 hover:opacity-90" style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }}>
               <a href={settings.ctaLink || "#storefront-contact"}>
                 {settings.ctaText} <ArrowRight className="ml-2 h-4 w-4" />
               </a>

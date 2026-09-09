@@ -7,6 +7,7 @@ import {
   Tags,
   ShoppingBag,
   CalendarClock,
+  Sparkles,
   Image as ImageIcon,
   Info,
   ShieldCheck,
@@ -21,6 +22,7 @@ import {
   categoriesSettingsSchema,
   productGridSettingsSchema,
   serviceGridSettingsSchema,
+  newArrivalsSettingsSchema,
   bannerSettingsSchema,
   aboutSettingsSchema,
   trustSettingsSchema,
@@ -36,6 +38,7 @@ import { PopularBlock } from "@/components/page-builder/blocks/popular-block"
 import { CategoriesBlock } from "@/components/page-builder/blocks/categories-block"
 import { ProductGridBlock } from "@/components/page-builder/blocks/product-grid-block"
 import { ServiceGridBlock } from "@/components/page-builder/blocks/service-grid-block"
+import { NewArrivalsBlock } from "@/components/page-builder/blocks/new-arrivals-block"
 import { BannerBlock } from "@/components/page-builder/blocks/banner-block"
 import { AboutBlock } from "@/components/page-builder/blocks/about-block"
 import { TrustBlock } from "@/components/page-builder/blocks/trust-block"
@@ -119,6 +122,13 @@ export const blockRegistry: { [K in BlockType]: BlockDefinition<K> } = {
     defaultSettings: serviceGridSettingsSchema.parse({}),
     Render: ServiceGridBlock,
   },
+  "new-arrivals": {
+    type: "new-arrivals",
+    label: "New Arrivals",
+    icon: Sparkles,
+    defaultSettings: newArrivalsSettingsSchema.parse({}),
+    Render: NewArrivalsBlock,
+  },
   banner: {
     type: "banner",
     label: "Promotional Banner",
@@ -175,4 +185,7 @@ export const BLOCK_TYPES: BlockType[] = [
   "footer",
 ]
 
-export const ALL_BLOCK_TYPES: BlockType[] = [...BLOCK_TYPES, "contact-info"]
+// Opt-in only, added via "Add Section" — not part of every new business's
+// starter page, since an empty New Arrivals section before any products
+// exist would just be a confusing blank block.
+export const ALL_BLOCK_TYPES: BlockType[] = [...BLOCK_TYPES, "new-arrivals", "contact-info"]

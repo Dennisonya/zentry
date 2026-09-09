@@ -1,16 +1,7 @@
-"use client"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ShoppingCart, Check } from "lucide-react"
+import { ShoppingCart } from "lucide-react"
 import { groupByCategory } from "@/lib/product-categories"
+import { ProductCard } from "@/components/storefront/product-card"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
-
-function money(n: number) {
-  const x = Number(n)
-  return Number.isFinite(x) ? x.toFixed(2) : "0.00"
-}
 
 const alignmentClass = {
   left: "text-left",
@@ -18,15 +9,9 @@ const alignmentClass = {
   right: "text-right",
 } as const
 
-export function ProductGridBlock({ products, settings, onAddToCart }: BlockRenderProps<"product-grid">) {
+export function ProductGridBlock({ business, products, settings, onAddToCart }: BlockRenderProps<"product-grid">) {
+  const accentColor = business.accent_color || business.theme_color
   const groups = settings.groupByCategory ? groupByCategory(products) : [{ category: "", items: products }]
-  const [addedProductId, setAddedProductId] = useState<string | null>(null)
-
-  const handleAdd = (product: (typeof products)[number]) => {
-    onAddToCart(product)
-    setAddedProductId(product.id)
-    window.setTimeout(() => setAddedProductId((current) => (current === product.id ? null : current)), 1200)
-  }
 
   return (
     <section id="storefront-products" className="container mx-auto px-4 py-12">
@@ -45,24 +30,7 @@ export function ProductGridBlock({ products, settings, onAddToCart }: BlockRende
               )}
               <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.items.map((product) => (
-                  <Card key={product.id} className="group overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                    {product.image_url && (
-                      <div className="aspect-square overflow-hidden bg-muted">
-                        <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                      </div>
-                    )}
-                    <CardContent className="p-5">
-                      <h3 className="mb-1 text-lg font-semibold">{product.name}</h3>
-                      {product.description && <p className="mb-3 text-sm text-muted-foreground">{product.description}</p>}
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-lg font-bold">${money(product.price)}</span>
-                        <Button size="sm" onClick={() => handleAdd(product)}>
-                          {addedProductId === product.id ? <Check className="mr-2 h-4 w-4" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
-                          {addedProductId === product.id ? "Added" : "Add to cart"}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ProductCard key={product.id} product={product} accentColor={accentColor} onAddToCart={onAddToCart} businessSlug={business.slug} />
                 ))}
               </div>
             </div>

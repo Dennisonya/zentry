@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Phone, Mail, MapPin, MessageCircle, Instagram } from "lucide-react"
+import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 
 const alignmentClass = {
@@ -63,8 +64,8 @@ export function ContactInfoBlock({ business, settings }: BlockRenderProps<"conta
           {settings.showInstagram && business.instagram_handle && (
             <Button
               onClick={() => window.open(`https://instagram.com/${business.instagram_handle}`, "_blank")}
-              className="bg-pink-600 text-white hover:bg-pink-700"
-              style={{ backgroundColor: accentColor }}
+              className="hover:opacity-90"
+              style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }}
             >
               <Instagram className="mr-2 h-4 w-4" /> Instagram
             </Button>

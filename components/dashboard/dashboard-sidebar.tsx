@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -16,6 +16,7 @@ import {
   Sparkles,
   Menu,
   Palette,
+  Bell,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
@@ -33,11 +34,13 @@ function NavLink({
   icon: Icon,
   label,
   active,
+  badge,
 }: {
   href: string
   icon: React.ElementType
   label: string
   active: boolean
+  badge?: number
 }) {
   return (
     <Link
@@ -48,7 +51,12 @@ function NavLink({
       )}
     >
       <Icon className="h-[18px] w-[18px] shrink-0" />
-      <span>{label}</span>
+      <span className="flex-1">{label}</span>
+      {!!badge && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
     </Link>
   )
 }
@@ -57,8 +65,36 @@ function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
   const pathname = usePathname()
   const router = useRouter()
   const [ordersOpen, setOrdersOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const isOrdersSection = pathname?.startsWith("/dashboard/orders") || pathname?.startsWith("/dashboard/bookings")
+
+  useEffect(() => {
+    let mounted = true
+    const supabase = getSupabaseClient()
+
+    const loadUnread = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: business } = await (supabase as any).from("businesses").select("id").eq("user_id", user.id).maybeSingle()
+      if (!business || !mounted) return
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", business.id)
+        .is("read_at", null)
+      if (mounted) setUnreadCount(count ?? 0)
+    }
+
+    loadUnread()
+    return () => {
+      mounted = false
+    }
+    // Re-checks whenever the sidebar mounts on a new page — good enough for
+    // a badge that doesn't need to be perfectly real-time.
+  }, [pathname])
 
   const handleSignOut = async () => {
     const supabase = getSupabaseClient()
@@ -149,6 +185,13 @@ function SidebarNavContent({ inventoryHref }: { inventoryHref: string }) {
               icon={Palette}
               label="Design"
               active={pathname === "/dashboard/design"}
+            />
+            <NavLink
+              href="/dashboard/notifications"
+              icon={Bell}
+              label="Notifications"
+              active={pathname === "/dashboard/notifications"}
+              badge={unreadCount}
             />
           </div>
         </div>

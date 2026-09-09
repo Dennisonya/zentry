@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { decrementStockForOrder } from "@/lib/inventory-notifications"
 import type { StoreCartItem } from "@/lib/store-cart"
 
 interface StoreCartDrawerProps {
@@ -18,8 +19,8 @@ interface StoreCartDrawerProps {
   businessName: string
   whatsappNumber?: string | null
   items: StoreCartItem[]
-  onQuantityChange: (productId: string, quantity: number) => void
-  onRemove: (productId: string) => void
+  onQuantityChange: (productId: string, quantity: number, variantId: string | null) => void
+  onRemove: (productId: string, variantId: string | null) => void
   onClear: () => void
 }
 
@@ -125,6 +126,8 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
             price: item.price,
             quantity: item.quantity,
             image_url: item.imageUrl,
+            variant_id: item.variantId,
+            variant_label: item.variantLabel ?? null,
           })),
           delivery_address: form.address,
           additional_notes: form.notes || null,
@@ -134,6 +137,19 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
         .single()
 
       if (insertError) throw insertError
+
+      // Best-effort — a stock-sync hiccup must never block the order the
+      // customer just successfully placed.
+      decrementStockForOrder(
+        businessId,
+        items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          name: item.name,
+          variantLabel: item.variantLabel,
+          quantity: item.quantity,
+        })),
+      ).catch(() => {})
 
       notifyBusiness()
       setSuccess(`Order ${insertedOrder?.id ? `#${String(insertedOrder.id).slice(0, 8)}` : ""} placed successfully.`)
@@ -167,9 +183,9 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
               ) : (
                 <div className="space-y-4">
                   {items.map((item) => (
-                    <div key={item.productId} className="flex gap-3 rounded-2xl border p-3">
+                    <div key={`${item.productId}:${item.variantId ?? "base"}`} className="flex gap-3 rounded-2xl border p-3">
                       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-muted">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-muted-foreground">No image</div>}</div>
-                      <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{item.name}</p><p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p></div><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRemove(item.productId)}><Trash2 className="h-4 w-4" /></Button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none" onClick={() => onQuantityChange(item.productId, item.quantity - 1)}><Minus className="h-3.5 w-3.5" /></Button><span className="w-8 text-center text-sm font-medium">{item.quantity}</span><Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none" onClick={() => onQuantityChange(item.productId, item.quantity + 1)}><Plus className="h-3.5 w-3.5" /></Button></div><p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p></div></div>
+                      <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{item.name}</p>{item.variantLabel && <p className="text-xs text-muted-foreground">{item.variantLabel}</p>}<p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p></div><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRemove(item.productId, item.variantId)}><Trash2 className="h-4 w-4" /></Button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none" onClick={() => onQuantityChange(item.productId, item.quantity - 1, item.variantId)}><Minus className="h-3.5 w-3.5" /></Button><span className="w-8 text-center text-sm font-medium">{item.quantity}</span><Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none" onClick={() => onQuantityChange(item.productId, item.quantity + 1, item.variantId)}><Plus className="h-3.5 w-3.5" /></Button></div><p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p></div></div>
                     </div>
                   ))}
                 </div>

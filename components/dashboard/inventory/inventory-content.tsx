@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { distinctCategories, getStockStatus, type StockStatus } from "@/lib/product-categories"
+import { checkAndNotifyLowStock } from "@/lib/inventory-notifications"
 import type { Business, Product } from "@/components/dashboard-content"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,11 +142,20 @@ export function InventoryContent({ business, products, onProductsChange, autoOpe
 
   const adjustStock = async (product: Product, delta: number) => {
     if (!product.track_inventory || product.stock_quantity === null) return
-    const next = Math.max(0, product.stock_quantity + delta)
+    const stockBefore = product.stock_quantity
+    const next = Math.max(0, stockBefore + delta)
     setPendingStockId(product.id)
     try {
       const supabase = getSupabaseClient() as any
       await supabase.from("products").update({ stock_quantity: next }).eq("id", product.id)
+      await checkAndNotifyLowStock({
+        businessId: business.id,
+        productId: product.id,
+        productName: product.name,
+        stockBefore,
+        stockAfter: next,
+        threshold: product.low_stock_threshold ?? 5,
+      })
       onProductsChange()
     } finally {
       setPendingStockId(null)
@@ -286,7 +296,9 @@ export function InventoryContent({ business, products, onProductsChange, autoOpe
           ) : (
             filtered.map((product) => {
               const status = getStockStatus(product)
-              const badge = STOCK_BADGE[status]
+              const badge = product.has_variants
+                ? { label: "Has options", className: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400" }
+                : STOCK_BADGE[status]
               return (
                 <Card key={product.id} className={!product.is_available ? "opacity-60" : ""}>
                   <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
