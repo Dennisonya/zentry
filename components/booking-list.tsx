@@ -67,14 +67,6 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
   const [newBookingTime, setNewBookingTime] = useState("")
   const [rescheduleNote, setRescheduleNote] = useState("")
 
-  if (bookings.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>No bookings yet. Once customers book your services they'll appear here.</p>
-      </div>
-    )
-  }
-
   const updateStatus = async (bookingId: string, newStatus: string) => {
     setLoading(bookingId)
     try {
@@ -169,6 +161,14 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
   const canCancel = (status: string) => !["cancelled", "completed"].includes(status)
   const canReschedule = (status: string) => ["pending", "confirmed", "inquiry"].includes(status)
   const canComplete = (status: string) => ["confirmed", "rescheduled"].includes(status)
+
+  if (bookings.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <p>No bookings yet. Once customers book your services they'll appear here.</p>
+      </div>
+    )
+  }
 
   return (
     <>
