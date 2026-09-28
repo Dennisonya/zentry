@@ -1,15 +1,9 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { Suspense, useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { getSupabaseClient } from "@/lib/supabase"
-import {
-  generateOTP,
-  generateDeliveryCode,
-  otpExpiresAt,
-  isOTPValid,
-  maskName,
-} from "@/lib/otp"
+import { maskName } from "@/lib/otp"
 import { format, parseISO } from "date-fns"
 import { CheckCircle2, Package, Loader2, ShieldCheck, Send, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +16,8 @@ interface OrderItem {
   quantity: number
 }
 
+// Shape returned by the get_order_by_confirmation_token RPC (scripts/020).
+// delivery_code is only present once the order is confirmed.
 interface ConfirmOrder {
   id: string
   customer_name: string
@@ -30,19 +26,23 @@ interface ConfirmOrder {
   status: string
   order_items: OrderItem[]
   created_at: string
-  confirmation_token: string
   confirmed_at: string | null
-  otp_code: string | null
-  otp_expires_at: string | null
   delivery_code: string | null
-  delivery_address: string | null
-  additional_notes: string | null
 }
-export const dynamic = 'force-dynamic'
+
+// Postgres RAISE messages come back as error.message; show them as-is.
+const rpcErrorMessage = (error: { message?: string } | null, fallback: string) =>
+  error?.message || fallback
+
 export default function ConfirmOrderPage() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-4"><LoadingState /></div>}>
+      <ConfirmOrderContent />
+    </Suspense>
+  )
+}
+
+function ConfirmOrderContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
 
@@ -59,24 +59,14 @@ export default function ConfirmOrderPage() {
   const [countdown, setCountdown] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── FIX: Store OTP + expiry in refs, NOT read back from DB.
-  // The original bug: handleVerifyOTP re-fetched otp_expires_at from Supabase.
-  // If the column didn't exist yet (migration not run) or the select returned
-  // null for any reason, isOTPValid(null) → false → "expired" immediately.
-  // Solution: write the values into refs when we generate them in handleSendOTP
-  // and use refs as the single source of truth during verification.
-  const sessionOtp = useRef<string | null>(null)
-  const sessionOtpExpiry = useRef<string | null>(null)
-
+  // The order is read, the code issued, and the code checked entirely by
+  // SECURITY DEFINER functions (scripts/016 + 020). The browser never writes
+  // to the orders table and never sees the stored code.
   useEffect(() => {
     if (!token) { setPageState("not_found"); return }
     const fetchOrder = async () => {
       const supabase = getSupabaseClient()
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("confirmation_token", token)
-        .single()
+      const { data, error } = await supabase.rpc("get_order_by_confirmation_token", { p_token: token } as unknown as never)
       if (error || !data) { setPageState("not_found"); return }
       const fetched = data as ConfirmOrder
       setOrder(fetched)
@@ -105,99 +95,59 @@ export default function ConfirmOrderPage() {
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
   const handleSendOTP = async () => {
-    if (!order) return
+    if (!order || !token) return
     setSendingOtp(true)
     setOtpError("")
     try {
       const supabase = getSupabaseClient()
-      const otp = generateOTP()
-      const deliveryCode = order.delivery_code ?? generateDeliveryCode()
-      const expiresAt = otpExpiresAt(5)
+      const { data, error } = await supabase.rpc("request_order_confirmation_code", { p_token: token } as unknown as never)
+      if (error || !data) throw new Error(rpcErrorMessage(error, "Failed to generate code. Please try again."))
+      const { code, expires_in_seconds } = data as { code: string; expires_in_seconds: number }
 
-      const { error } = await supabase
-        .from("orders")
-        .update({ otp_code: otp, otp_expires_at: expiresAt, delivery_code: deliveryCode })
-        .eq("id", order.id)
-      if (error) throw error
+      // In production: send the code by WhatsApp / SMS from the database
+      // function instead of returning it here.
+      console.log(`[Zentry OTP] Order ${order.id} — OTP: ${code}`)
 
-      // ✅ KEY FIX: persist to refs immediately after generation.
-      // These refs are the ground truth used in handleVerifyOTP.
-      sessionOtp.current = otp
-      sessionOtpExpiry.current = expiresAt
-
-      setOrder((prev) =>
-        prev ? { ...prev, otp_code: otp, otp_expires_at: expiresAt, delivery_code: deliveryCode } : prev
-      )
-
-      // In production: replace with WhatsApp / SMS integration
-      console.log(`[Zentry OTP] Order ${order.id} — OTP: ${otp} | Delivery code: ${deliveryCode}`)
-
+      setOtpInput("")
       setPageState("otp_sent")
-      startCountdown(300)
-    } catch {
-      setOtpError("Failed to generate code. Please try again.")
+      startCountdown(expires_in_seconds ?? 300)
+    } catch (e: any) {
+      setOtpError(e.message ?? "Failed to generate code. Please try again.")
     } finally {
       setSendingOtp(false)
     }
   }
 
   const handleVerifyOTP = async () => {
-    if (!order) return
+    if (!order || !token) return
     setOtpError("")
     setVerifyingOtp(true)
     try {
       const supabase = getSupabaseClient()
+      const { data, error } = await supabase.rpc("verify_order_confirmation_code", {
+        p_token: token,
+        p_code: otpInput.trim(),
+      } as unknown as never)
+      if (error || !data) throw new Error(rpcErrorMessage(error, "Verification failed. Please try again."))
 
-      // ── Step 1: DB re-fetch ONLY to prevent replay attacks (already confirmed / cancelled).
-      // We intentionally do NOT read otp_code / otp_expires_at from the DB here —
-      // that was the original bug. Those columns may return null if the migration
-      // hasn't been applied, causing a false "expired" error.
-      const { data: fresh, error: fetchErr } = await supabase
-        .from("orders")
-        .select("status, confirmed_at")
-        .eq("id", order.id)
-        .single()
+      const result = data as
+        | { ok: true; confirmed_at: string; delivery_code: string | null }
+        | { ok: false; attempts_left: number }
 
-      if (fetchErr || !fresh) throw new Error("Could not reach the server. Please try again.")
-
-      if (fresh.status === "completed" || fresh.confirmed_at) {
-        setOtpError("This order has already been confirmed.")
-        return
-      }
-      if (fresh.status === "cancelled") {
-        setOtpError("This order has been cancelled.")
+      if (!result.ok) {
+        setOtpError(
+          result.attempts_left > 0
+            ? `Incorrect code. ${result.attempts_left} ${result.attempts_left === 1 ? "attempt" : "attempts"} left.`
+            : "Incorrect code. Please request a new one."
+        )
         return
       }
 
-      // ── Step 2: Validate against session refs (set during handleSendOTP).
-      if (!sessionOtp.current || !sessionOtpExpiry.current) {
-        setOtpError('No active code found. Please click "Send Code" again.')
-        return
-      }
-
-      if (!isOTPValid(sessionOtpExpiry.current)) {
-        setOtpError("This code has expired. Please request a new one.")
-        return
-      }
-
-      if (sessionOtp.current !== otpInput.trim()) {
-        setOtpError("Incorrect code. Please check and try again.")
-        return
-      }
-
-      // ── Step 3: All checks passed → mark as completed.
-      const now = new Date().toISOString()
-      const { error: updateErr } = await supabase
-        .from("orders")
-        .update({ status: "completed", confirmed_at: now })
-        .eq("id", order.id)
-      if (updateErr) throw updateErr
-
-      // Clear refs so the code cannot be reused
-      sessionOtp.current = null
-      sessionOtpExpiry.current = null
-
-      setOrder((prev) => (prev ? { ...prev, status: "completed", confirmed_at: now } : prev))
+      setOrder((prev) =>
+        prev
+          ? { ...prev, status: "completed", confirmed_at: result.confirmed_at, delivery_code: result.delivery_code }
+          : prev
+      )
       setPageState("success")
     } catch (e: any) {
       setOtpError(e.message ?? "Verification failed. Please try again.")
@@ -212,12 +162,7 @@ export default function ConfirmOrderPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
 
-        {pageState === "loading" && (
-          <div className="text-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Looking up your order…</p>
-          </div>
-        )}
+        {pageState === "loading" && <LoadingState />}
 
         {pageState === "not_found" && (
           <Card>
@@ -379,6 +324,15 @@ export default function ConfirmOrderPage() {
           </span>
         </p>
       </div>
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="text-center py-16">
+      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+      <p className="text-muted-foreground">Looking up your order…</p>
     </div>
   )
 }
