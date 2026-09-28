@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 021: Deliver confirmation codes by SMS / WhatsApp
+-- Migration 021: Deliver confirmation codes by SMS
 -- ============================================================
 -- Until now request_order_confirmation_code() handed the plain code back
 -- to the browser, so the code proved nothing beyond having the link.
@@ -8,7 +8,7 @@
 -- function generates the code here, texts it to the customer's phone, and
 -- never returns it to the browser.
 --
--- Also adds send limits, since every request now costs an SMS/WhatsApp
+-- Also adds send limits, since every request now costs an SMS
 -- message and could be used to spam the customer's phone:
 --   * at most one code per minute per order
 --   * at most 5 codes per hour per order
