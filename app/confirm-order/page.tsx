@@ -30,9 +30,21 @@ interface ConfirmOrder {
   delivery_code: string | null
 }
 
+type CodeChannel = "sms" | "whatsapp"
+const channelLabel = (channel: CodeChannel) => (channel === "sms" ? "SMS" : "WhatsApp")
+
 // Postgres RAISE messages come back as error.message; show them as-is.
 const rpcErrorMessage = (error: { message?: string } | null, fallback: string) =>
   error?.message || fallback
+
+// The Edge Function answers errors as { error: "..." } written for customers.
+async function functionErrorMessage(error: any, fallback: string): Promise<string> {
+  try {
+    const body = await error?.context?.json()
+    if (typeof body?.error === "string") return body.error
+  } catch {}
+  return fallback
+}
 
 export default function ConfirmOrderPage() {
   return (
@@ -57,6 +69,8 @@ function ConfirmOrderContent() {
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [otpError, setOtpError] = useState("")
   const [countdown, setCountdown] = useState(0)
+  const [codeChannel, setCodeChannel] = useState<CodeChannel>("sms")
+  const [sentTo, setSentTo] = useState("")
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // The order is read, the code issued, and the code checked entirely by
@@ -94,25 +108,27 @@ function ConfirmOrderContent() {
   }
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  const handleSendOTP = async () => {
+  const handleSendOTP = async (channel: CodeChannel) => {
     if (!order || !token) return
     setSendingOtp(true)
     setOtpError("")
     try {
+      // The Edge Function texts the code to the phone on the order; the
+      // browser never sees it (supabase/functions/send-order-confirmation-code).
       const supabase = getSupabaseClient()
-      const { data, error } = await supabase.rpc("request_order_confirmation_code", { p_token: token } as unknown as never)
-      if (error || !data) throw new Error(rpcErrorMessage(error, "Failed to generate code. Please try again."))
-      const { code, expires_in_seconds } = data as { code: string; expires_in_seconds: number }
+      const { data, error } = await supabase.functions.invoke("send-order-confirmation-code", {
+        body: { token, channel },
+      })
+      if (error || !data) throw new Error(await functionErrorMessage(error, "Failed to send the code. Please try again."))
+      const { sent_to, expires_in_seconds } = data as { sent_to: string; expires_in_seconds: number }
 
-      // In production: send the code by WhatsApp / SMS from the database
-      // function instead of returning it here.
-      console.log(`[Zentry OTP] Order ${order.id} — OTP: ${code}`)
-
+      setCodeChannel(channel)
+      setSentTo(sent_to)
       setOtpInput("")
       setPageState("otp_sent")
       startCountdown(expires_in_seconds ?? 300)
     } catch (e: any) {
-      setOtpError(e.message ?? "Failed to generate code. Please try again.")
+      setOtpError(e.message ?? "Failed to send the code. Please try again.")
     } finally {
       setSendingOtp(false)
     }
@@ -227,20 +243,35 @@ function ConfirmOrderContent() {
               {pageState === "ready" && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Click below to generate a 6-digit confirmation code.
+                    We&apos;ll send a 6-digit code to the phone number on this order.
                   </p>
-                  <Button className="w-full" onClick={handleSendOTP} disabled={sendingOtp}>
-                    {sendingOtp ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                    {sendingOtp ? "Generating…" : "Send Code"}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["sms", "whatsapp"] as const).map((channel) => (
+                      <Button
+                        key={channel}
+                        variant={channel === "sms" ? "default" : "outline"}
+                        onClick={() => handleSendOTP(channel)}
+                        disabled={sendingOtp}
+                      >
+                        {sendingOtp ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                        {channel === "sms" ? "Text me" : "WhatsApp"}
+                      </Button>
+                    ))}
+                  </div>
+                  {otpError && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      <span>{otpError}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {pageState === "otp_sent" && (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    A 6-digit code has been generated
-                    {order.customer_phone ? ` for ${order.customer_phone}` : ""}.
+                    We sent a 6-digit code by {channelLabel(codeChannel)}
+                    {sentTo ? ` to ${sentTo}` : ""}.
                     Enter it below to confirm your order.
                   </p>
 
@@ -252,7 +283,7 @@ function ConfirmOrderContent() {
                   {countdown === 0 && (
                     <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
                       Code expired.{" "}
-                      <button onClick={handleSendOTP} className="underline font-medium">Resend</button>
+                      <button onClick={() => handleSendOTP(codeChannel)} className="underline font-medium">Resend</button>
                     </div>
                   )}
 
@@ -282,13 +313,23 @@ function ConfirmOrderContent() {
                     {verifyingOtp ? "Verifying…" : "Confirm Order"}
                   </Button>
 
-                  <button
-                    onClick={handleSendOTP}
-                    disabled={sendingOtp || countdown > 240}
-                    className="w-full text-xs text-muted-foreground underline underline-offset-2 disabled:opacity-40 disabled:no-underline"
-                  >
-                    Didn't get a code? Resend
-                  </button>
+                  {/* The database allows one code per minute, matching countdown > 240. */}
+                  <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+                    <button
+                      onClick={() => handleSendOTP(codeChannel)}
+                      disabled={sendingOtp || countdown > 240}
+                      className="underline underline-offset-2 disabled:opacity-40 disabled:no-underline"
+                    >
+                      Didn&apos;t get a code? Resend
+                    </button>
+                    <button
+                      onClick={() => handleSendOTP(codeChannel === "sms" ? "whatsapp" : "sms")}
+                      disabled={sendingOtp || countdown > 240}
+                      className="underline underline-offset-2 disabled:opacity-40 disabled:no-underline"
+                    >
+                      Use {codeChannel === "sms" ? "WhatsApp" : "SMS"} instead
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
