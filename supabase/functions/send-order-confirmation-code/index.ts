@@ -92,7 +92,9 @@ Deno.serve(async (req) => {
   if (typeof token !== "string" || !token) return json({ error: "Order not found" }, 404)
 
   // Check config before issuing a code so a missing secret doesn't burn a send.
-  if (!twilioSid() || !env("TWILIO_AUTH_TOKEN")) {
+  const missing = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"].filter((name) => !env(name))
+  if (missing.length) {
+    console.error(`SMS not configured: missing Edge Function secret(s) ${missing.join(", ")}`)
     return json({ error: "Sending codes by SMS isn't available yet" }, 503)
   }
 
