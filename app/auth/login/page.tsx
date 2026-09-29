@@ -8,10 +8,11 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Zap, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { AuthShell } from "@/components/auth/auth-shell"
+import { OAuthButtons } from "@/components/auth/oauth-buttons"
 
 function safeNextPath(raw: string | null): string | null {
   if (!raw) return null
@@ -26,6 +27,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,77 +85,102 @@ function LoginForm() {
   }
 
   const signUpHref = nextPath ? `/auth/sign-up?next=${encodeURIComponent(nextPath)}` : "/auth/sign-up"
+  const forgotPasswordHref = nextPath
+    ? `/auth/forgot-password?next=${encodeURIComponent(nextPath)}`
+    : "/auth/forgot-password"
+
+  // No `intent` param here — sign-in is shared by customers and business
+  // owners, and a first-time OAuth user should fall through to the existing
+  // 'personal' profile default (see auth/callback).
+  const oauthRedirectTo =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/auth/callback${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""}`
+      : "/auth/callback"
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <div className="flex items-center justify-center mb-4">
-          <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-            <Zap className="h-6 w-6 text-primary-foreground" />
-          </div>
+    <AuthShell
+      title="Welcome back"
+      subtitle={nextPath ? "Sign in to continue your order or booking" : "Sign in to your Zentry account"}
+      rightHeadline="Everything you need to run your storefront."
+      rightSubcopy="Orders, inventory, and customers — pick up right where you left off."
+    >
+      <OAuthButtons mode="sign-in" redirectTo={oauthRedirectTo} onError={(message) => setError(message || null)} />
+
+      <div className="my-6 flex items-center gap-4 text-xs font-medium text-muted-foreground">
+        <div className="h-px flex-1 bg-border" />
+        or
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+          />
         </div>
-        <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-        <CardDescription className="text-center">
-          {nextPath ? "Sign in to continue your order or booking" : "Sign in to your Zentry account"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
+            <Link href={forgotPasswordHref} className="text-xs text-primary hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
+              className="pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
+        </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </Button>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Signing in..." : "Sign In"}
+        </Button>
 
-          <p className="text-sm text-center text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href={signUpHref} className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </form>
-      </CardContent>
-    </Card>
+        <p className="text-sm text-center text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href={signUpHref} className="text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   )
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20 p-4">
-      <Suspense fallback={<div className="text-muted-foreground text-sm">Loading...</div>}>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="text-muted-foreground text-sm">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

@@ -261,7 +261,7 @@ export default function OnboardingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 dark:from-purple-950 dark:via-blue-950 dark:to-indigo-950 p-4 py-12">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 p-4 py-12">
       <div className="max-w-4xl mx-auto">
         {/* Progress Steps */}
         <div className="mb-8">
@@ -272,14 +272,14 @@ export default function OnboardingPage() {
                   <div
                     className={`flex items-center justify-center w-10 h-10 rounded-full ${
                       currentStep >= step.id
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                        ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {currentStep > step.id ? <Check className="h-6 w-6" /> : <step.icon className="h-6 w-6" />}
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={`flex-1 h-1 mx-4 ${currentStep > step.id ? "bg-purple-600" : "bg-muted"}`} />
+                    <div className={`flex-1 h-1 mx-4 ${currentStep > step.id ? "bg-primary" : "bg-muted"}`} />
                   )}
                 </div>
                 <div className="mt-2 text-center">
