@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Placeholders so the build works without real secrets.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # next.config sets typescript.ignoreBuildErrors, and the codebase still has
+      # type errors, so this step reports them without failing the job.
+      # Remove continue-on-error once `npm run typecheck` passes.
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee tsc.log
+      - name: Typecheck summary
+        if: always()
+        run: |
+          count=$(grep -c "error TS" tsc.log || true)
+          echo "### TypeScript: ${count} error(s)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$count" != "0" ]; then
+            echo "::warning title=TypeScript::${count} type error(s); see the Typecheck step log"
+          fi
+
+      - name: Build
+        run: npm run build
