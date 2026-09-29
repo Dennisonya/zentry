@@ -63,7 +63,10 @@ async function sendSms(to: string, code: string, businessName: string | null) {
   else if (from) form.set("From", from)
   else {
     const accountNumber = await findAccountSmsNumber()
-    if (!accountNumber) throw new Error("no_sender")
+    if (!accountNumber) {
+      console.error("No SMS sender: set TWILIO_SMS_FROM or TWILIO_MESSAGING_SERVICE_SID, or add an SMS-capable number to the Twilio account")
+      throw new Error("no_sender")
+    }
     form.set("From", accountNumber)
   }
 
@@ -121,6 +124,9 @@ Deno.serve(async (req) => {
   try {
     await sendSms(to, code, business_name)
   } catch {
+    // Nothing reached the customer, so don't let this attempt count toward
+    // the one-per-minute / five-per-hour limits.
+    await supabase.rpc("cancel_undelivered_confirmation_code", { p_token: token })
     return json({ error: "We couldn't send the code. Please try again in a minute" }, 502)
   }
 
