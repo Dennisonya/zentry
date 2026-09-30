@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ShoppingCart, Check } from "lucide-react"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { Product } from "@/components/business-layouts"
+import { FavoriteButton } from "@/components/favorite-button"
 
 function money(n: number) {
   const x = Number(n)
@@ -50,7 +51,16 @@ export function ProductCard({ product, accentColor, onAddToCart, businessSlug }:
 
   return (
     <Card className="group overflow-hidden border-border/60 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-      {href ? <Link href={href}>{media}</Link> : media}
+      <div className="relative">
+        {href ? <Link href={href}>{media}</Link> : media}
+        <FavoriteButton
+          kind="product"
+          id={product.id}
+          name={product.name}
+          className="absolute right-2 top-2 h-8 w-8 bg-background/85 shadow-sm backdrop-blur hover:bg-background"
+          iconClassName="h-4 w-4"
+        />
+      </div>
       <CardContent className="p-4">
         {href ? (
           <Link href={href} className="hover:underline">

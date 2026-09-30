@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, MapPin, Phone, Instagram, MessageCircle, UserRound } from "lucide-react"
 import Link from "next/link"
 import { getSupabaseClient } from "@/lib/supabase"
+import { FavoriteButton } from "@/components/favorite-button"
 
 interface Business {
   id: string
@@ -158,7 +159,13 @@ export function MarketplaceContent({ businesses }: { businesses: Business[] }) {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredBusinesses.map((business) => (
-              <Link key={business.id} href={`/${business.slug}`}>
+              <Link key={business.id} href={`/${business.slug}`} className="relative block">
+                <FavoriteButton
+                  kind="business"
+                  id={business.id}
+                  name={business.business_name}
+                  className="absolute right-3 top-3 z-10 bg-white/85 shadow-sm backdrop-blur hover:bg-white"
+                />
                 <Card className="h-full overflow-hidden rounded-2xl border-2 bg-white/80 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-purple-200 hover:shadow-xl">
                   <div
                     className="relative h-32"

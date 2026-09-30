@@ -16,6 +16,7 @@ import {
 import { getContrastTextColor } from "@/lib/color-contrast"
 import { getStockStatus, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
 import type { Business, Product } from "@/components/business-layouts"
+import { FavoriteButton } from "@/components/favorite-button"
 
 interface ProductImageRow {
   id: string
@@ -201,9 +202,10 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
             <p className="mt-4 text-sm text-muted-foreground">That combination isn't available.</p>
           )}
 
+          <div className="mt-6 flex items-center gap-3">
           <Button
             size="lg"
-            className="mt-6 w-full rounded-full sm:w-auto"
+            className="flex-1 rounded-full sm:flex-none"
             style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }}
             onClick={handleAdd}
             disabled={!canAdd}
@@ -211,6 +213,8 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
             {added ? <Check className="mr-2 h-4 w-4" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
             {added ? "Added" : canAdd ? "Add to cart" : "Unavailable"}
           </Button>
+          <FavoriteButton kind="product" id={product.id} name={product.name} className="h-11 w-11 shrink-0 border" />
+          </div>
         </div>
       </div>
 

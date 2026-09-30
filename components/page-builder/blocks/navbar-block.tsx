@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Search, Heart, ShoppingBag, Menu, X } from "lucide-react"
+import { Search, ShoppingBag, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { FavoriteButton } from "@/components/favorite-button"
 
 interface NavLink {
   label: string
@@ -95,11 +95,7 @@ export function NavbarBlock({
             </div>
           )}
 
-          <Button variant="ghost" size="icon" asChild aria-label="Favorites">
-            <Link href="/account/favorites">
-              <Heart className="h-[18px] w-[18px]" />
-            </Link>
-          </Button>
+          <FavoriteButton kind="business" id={business.id} name={business.business_name} className="h-10 w-10" />
 
           {settings.showCart && (
             <Button variant="ghost" size="icon" className="relative" onClick={onCartOpen} aria-label="Cart">

@@ -39,6 +39,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [hasBusiness, setHasBusiness] = useState(false)
   const [isPro, setIsPro] = useState(false)
+  const [unread, setUnread] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -46,18 +47,24 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [{ data: profile }, { data: business }] = await Promise.all([
+      const [{ data: profile }, { data: business }, { count: unreadCount }] = await Promise.all([
         supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle(),
         supabase.from("businesses").select("id").eq("user_id", user.id).limit(1).maybeSingle(),
+        supabase.from("customer_notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null),
       ])
 
       setName((profile as { full_name?: string | null } | null)?.full_name || user.email?.split("@")[0] || "My account")
       setAvatarUrl((profile as { avatar_url?: string | null } | null)?.avatar_url || null)
       setHasBusiness(Boolean(business))
+      setUnread(unreadCount ?? 0)
       // Keep this deliberately permissive until the subscription schema is added.
       setIsPro(Boolean(business))
     }
     load()
+    // The notifications page announces when it marks rows read.
+    const onRead = (event: Event) => setUnread((n) => Math.max(0, n - ((event as CustomEvent<number>).detail || 0)))
+    window.addEventListener("zentry:notifications-read", onRead)
+    return () => window.removeEventListener("zentry:notifications-read", onRead)
   }, [])
 
   const active = (item: (typeof nav)[number]) => item.exact ? pathname === item.href : pathname?.startsWith(item.href)
@@ -107,6 +114,11 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
             >
               <Icon className="h-[18px] w-[18px]" />
               {item.label}
+              {item.href === "/account/notifications" && unread > 0 && (
+                <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-primary">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
             </Link>
           )
         })}
