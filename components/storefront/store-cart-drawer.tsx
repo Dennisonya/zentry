@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { decrementStockForOrder } from "@/lib/inventory-notifications"
+import { placeOrder as placeOrderRpc, type PlacedOrder } from "@/lib/orders"
 import type { StoreCartItem } from "@/lib/store-cart"
 
 interface StoreCartDrawerProps {
@@ -85,12 +85,15 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
     }
   }
 
-  const notifyBusiness = () => {
+  const notifyBusiness = (order: PlacedOrder) => {
     if (!whatsappNumber) return
-    const itemLines = items
-      .map((item) => `• ${item.name} x${item.quantity} — $${(item.price * item.quantity).toFixed(2)}`)
+    const itemLines = order.items
+      .map((item) => {
+        const label = item.variant_label ? `${item.product_name} (${item.variant_label})` : item.product_name
+        return `• ${label} x${item.quantity} — $${(item.price * item.quantity).toFixed(2)}`
+      })
       .join("\n")
-    const message = `🛍️ NEW ZENTRY ORDER\n\nCustomer: ${form.fullName}\nPhone: ${form.phone}\nAddress: ${form.address}\n\nItems:\n${itemLines}\n\nTotal: $${subtotal.toFixed(2)}${form.notes ? `\n\nNotes: ${form.notes}` : ""}`
+    const message = `🛍️ NEW ZENTRY ORDER\n\nCustomer: ${form.fullName}\nPhone: ${form.phone}\nAddress: ${form.address}\n\nItems:\n${itemLines}\n\nTotal: $${order.total_amount.toFixed(2)}${form.notes ? `\n\nNotes: ${form.notes}` : ""}`
     const formattedNumber = whatsappNumber.replace(/[^0-9]/g, "")
     window.open(`https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`, "_blank")
   }
@@ -101,7 +104,7 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
     setError(null)
 
     try {
-      const supabase = getSupabaseClient() as any
+      const supabase = getSupabaseClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user || user.id !== userId) {
@@ -110,53 +113,25 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
         return
       }
 
-      const { data: insertedOrder, error: insertError } = await supabase
-        .from("orders")
-        .insert({
-          business_id: businessId,
-          customer_id: user.id,
-          customer_name: form.fullName,
-          customer_email: user.email || null,
-          customer_phone: form.phone,
-          total_amount: subtotal,
-          status: "pending",
-          order_items: items.map((item) => ({
-            product_id: item.productId,
-            product_name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            image_url: item.imageUrl,
-            variant_id: item.variantId,
-            variant_label: item.variantLabel ?? null,
-          })),
-          delivery_address: form.address,
-          additional_notes: form.notes || null,
-          inquiry_type: "order",
-        })
-        .select("id")
-        .single()
-
-      if (insertError) throw insertError
-
-      // Best-effort — a stock-sync hiccup must never block the order the
-      // customer just successfully placed.
-      decrementStockForOrder(
+      // Prices, promotions, the total and the stock decrement are all
+      // decided by the database — the cart only says what and how many.
+      const order = await placeOrderRpc(supabase, {
         businessId,
-        items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          name: item.name,
-          variantLabel: item.variantLabel,
-          quantity: item.quantity,
-        })),
-      ).catch(() => {})
+        lines: items.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })),
+        customerName: form.fullName,
+        customerPhone: form.phone,
+        deliveryAddress: form.address,
+        notes: form.notes,
+      })
 
-      notifyBusiness()
-      setSuccess(`Order ${insertedOrder?.id ? `#${String(insertedOrder.id).slice(0, 8)}` : ""} placed successfully.`)
+      notifyBusiness(order)
+      const totalNote = Math.abs(order.total_amount - subtotal) >= 0.01 ? ` Final total: $${order.total_amount.toFixed(2)}.` : ""
+      setSuccess(`Order #${order.order_id.slice(0, 8)} placed successfully.${totalNote}`)
       setCheckoutOpen(false)
       onClear()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to place order.")
+      setCheckoutOpen(false)
     } finally {
       setLoading(false)
     }
