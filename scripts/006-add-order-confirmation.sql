@@ -19,10 +19,7 @@ WHERE confirmation_token IS NULL;
 -- Index for fast lookup by token (used on the confirm-order page)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_confirmation_token ON orders(confirmation_token);
 
--- Allow anyone to fetch an order by confirmation token (for the public confirm page)
--- We expose only the fields needed — the RLS below allows SELECT on token match.
-CREATE POLICY "Anyone can view order by confirmation token"
-ON "orders"
-FOR SELECT
-TO PUBLIC
-USING (...);
+-- The public confirm page does not read orders through a table policy.
+-- A "SELECT by token" policy can't check that the caller actually knows
+-- the token, so lookups go through the get_order_by_confirmation_token()
+-- RPC instead (scripts/016, narrowed in scripts/020).

@@ -7,3 +7,9 @@
 
 DROP POLICY IF EXISTS "Anyone can create orders" ON public.orders;
 DROP POLICY IF EXISTS "Anyone can insert notifications" ON public.notifications;
+
+-- Leftovers from 025. On the live project these were neutralised with
+-- WITH CHECK (false) on 2026-10-05; dropping them just tidies up.
+DROP POLICY IF EXISTS "Anyone can create bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Anyone can create order items" ON public.order_items;
+DROP POLICY IF EXISTS "Anyone can insert page views" ON public.page_views;

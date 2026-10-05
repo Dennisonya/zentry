@@ -8,6 +8,9 @@
 --   * records page views on the server with the service-role key, which
 --     bypasses RLS (lib/analytics.ts).
 -- The orders/notifications policies stay until 024 (after PR #4 deploys).
+--
+-- Live (2026-10-05): applied, except the three open policies were
+-- switched to WITH CHECK (false) instead of dropped; 024 drops them.
 
 -- ---------------------------------------------------------------- checks
 -- NOT VALID + VALIDATE so the check of existing rows doesn't hold a long lock.
