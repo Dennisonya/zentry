@@ -83,7 +83,7 @@ export function getSupabaseClient() {
 // Requires service role key for server-side operations to bypass RLS
 export function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url) {
     throw new Error("Missing Supabase environment variable: NEXT_PUBLIC_SUPABASE_URL is required")
