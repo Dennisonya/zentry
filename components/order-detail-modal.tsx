@@ -34,6 +34,7 @@ interface OrderItem {
   product_name: string
   price: number
   quantity: number
+  service_inquiry?: boolean
 }
 
 export interface Order {

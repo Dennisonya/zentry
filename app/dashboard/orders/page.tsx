@@ -6,7 +6,8 @@ import type { User } from "@supabase/supabase-js"
 import { getSupabaseClient } from "@/lib/supabase"
 import { OrderList } from "@/components/order-list"
 import { DashboardSubpageLayout } from "@/components/dashboard-subpage-layout"
-import type { Business, Order } from "@/components/dashboard-content"
+import type { Business } from "@/components/dashboard-content"
+import type { Order } from "@/components/order-detail-modal"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 function isServiceBookingLike(order: Order) {
@@ -80,7 +81,6 @@ export default function DashboardOrdersPage() {
           <OrderList
             orders={orders}
             businessId={business.id}
-            onRecordsChange={() => refetchOrders(business.id)}
           />
         </CardContent>
       </Card>

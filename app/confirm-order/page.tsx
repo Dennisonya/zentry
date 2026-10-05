@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { Suspense, useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { getSupabaseClient } from "@/lib/supabase"
 import {
@@ -40,9 +40,15 @@ interface ConfirmOrder {
 }
 export const dynamic = 'force-dynamic'
 export default function ConfirmOrderPage() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  // useSearchParams() needs a Suspense boundary so the page can be prerendered.
+  return (
+    <Suspense fallback={null}>
+      <ConfirmOrderContent />
+    </Suspense>
+  )
+}
+
+function ConfirmOrderContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, TrendingUp, Eye, ShoppingBag, DollarSign } from "lucide-react"
 import { format, startOfDay, parseISO, startOfWeek, startOfMonth, subDays, subWeeks, subMonths } from "date-fns"
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Bar, BarChart } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { MobileDashboardNav } from "@/components/dashboard/dashboard-sidebar"
 
 interface Business {
