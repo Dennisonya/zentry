@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sparkles, AlertCircle, Plus, X, Check, CheckCircle2, Palette, Layout } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { businessDetailsSchema, productSchema, validate } from "@/lib/validation"
 import { LAYOUT_CONFIGS, BUSINESS_CATEGORIES, type LayoutStyle } from "@/lib/layouts"
 
 const ORDER_METHODS = [
@@ -102,7 +103,35 @@ export default function OnboardingPage() {
     setProducts(updated)
   }
 
+  // Checks everything entered so far; fields from later steps are optional,
+  // so this is safe to run on every step.
+  const checkEntries = () => {
+    const details = validate(businessDetailsSchema, {
+      businessName: formData.businessName,
+      phone: formData.phone,
+      email: formData.email,
+      whatsappNumber: formData.whatsappNumber,
+      instagramHandle: formData.instagramHandle,
+      address: formData.location,
+      description: formData.description,
+    })
+    if (!details.ok) return details
+
+    const productRows = []
+    for (const p of products.filter((p) => p.name.trim() || p.price.trim())) {
+      const row = validate(productSchema, { name: p.name, price: p.price, description: p.description })
+      if (!row.ok) return { ok: false as const, error: `${p.name.trim() || "Product"}: ${row.error}` }
+      productRows.push(row.data)
+    }
+    return { ok: true as const, details: details.data, products: productRows }
+  }
+
   const handleNext = () => {
+    const checked = checkEntries()
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
     if (currentStep === 1) {
       // Validate step 1
       if (!formData.businessName || !formData.category) {
@@ -124,6 +153,12 @@ export default function OnboardingPage() {
 
   const handleSubmit = async () => {
     setError(null)
+    const checked = checkEntries()
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+    const details = checked.details
     setLoading(true)
 
     try {
@@ -187,7 +222,7 @@ export default function OnboardingPage() {
         heroUrl = publicUrl
       }
 
-      const validProducts = products.filter((p) => p.name && p.price)
+      const validProducts = checked.products
 
       // Prefill plan from signup preference when available
       const { data: profile } = await supabase
@@ -202,16 +237,16 @@ export default function OnboardingPage() {
         .from("businesses")
         .insert({
           user_id: user.id,
-          business_name: formData.businessName,
+          business_name: details.businessName,
           business_type: formData.category,
           business_type_mode: formData.businessTypeMode,
           slug,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.location,
-          description: formData.description,
-          whatsapp_number: formData.whatsappNumber,
-          instagram_handle: formData.instagramHandle,
+          phone: details.phone,
+          email: details.email,
+          address: details.address,
+          description: details.description,
+          whatsapp_number: details.whatsappNumber,
+          instagram_handle: details.instagramHandle,
           order_method: formData.orderMethod,
           logo_url: logoUrl,
           layout_style: visualData.layoutStyle,
@@ -238,7 +273,7 @@ export default function OnboardingPage() {
           business_id: businessData.id,
           name: p.name,
           description: p.description,
-          price: Number.parseFloat(p.price),
+          price: p.price,
         }))
 
         const { error: productsError } = await supabase.from("products").insert(productInserts)
@@ -459,6 +494,7 @@ export default function OnboardingPage() {
                                   placeholder="Price (e.g., 9.99)"
                                   type="number"
                                   step="0.01"
+                                  min="0"
                                   value={product.price}
                                   onChange={(e) => updateProduct(index, "price", e.target.value)}
                                   disabled={loading}

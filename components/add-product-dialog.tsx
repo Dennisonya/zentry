@@ -19,6 +19,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { productSchema, serviceSchema, validate } from "@/lib/validation"
 
 interface AddProductDialogProps {
   open: boolean
@@ -51,38 +52,39 @@ export function AddProductDialog({ open, onOpenChange, businessId }: AddProductD
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setLoading(true)
 
+    if (!createType) {
+      setError("Please choose what you want to create.")
+      return
+    }
+
+    const product = createType === "product" ? validate(productSchema, productForm) : null
+    const service = createType === "service" ? validate(serviceSchema, serviceForm) : null
+    const problem = (product && !product.ok && product.error) || (service && !service.ok && service.error)
+    if (problem) {
+      setError(problem)
+      return
+    }
+
+    setLoading(true)
     try {
       const supabase = getSupabaseClient() as any
 
-      if (!createType) {
-        throw new Error("Please choose what you want to create.")
-      }
-
-      if (createType === "product") {
+      if (product?.ok) {
         const { error: insertError } = await supabase.from("products").insert({
           business_id: businessId,
-          name: productForm.name,
-          description: productForm.description || null,
-          price: Number.parseFloat(productForm.price),
-          category: productForm.category || null,
+          ...product.data,
           image_url: productForm.imageUrl || null,
           is_available: true,
         })
         if (insertError) throw insertError
-      } else {
-        const duration =
-          serviceForm.durationMinutes.trim() === "" ? null : Number.parseInt(serviceForm.durationMinutes, 10)
+      } else if (service?.ok) {
+        const { durationMinutes, ...fields } = service.data
         const { error: insertError } = await supabase.from("services").insert({
           business_id: businessId,
-          name: serviceForm.name,
-          description: serviceForm.description || null,
-          price: Number.parseFloat(serviceForm.price),
-          category: serviceForm.category || null,
+          ...fields,
           image_url: serviceForm.imageUrl || null,
-          duration_minutes: Number.isFinite(duration as any) ? duration : null,
-          location: serviceForm.location || null,
+          duration_minutes: durationMinutes,
           is_available: true,
         })
         if (insertError) throw insertError

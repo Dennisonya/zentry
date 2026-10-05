@@ -18,6 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
+import { productSchema, validate } from "@/lib/validation"
 
 interface Product {
   id: string
@@ -61,7 +64,7 @@ export function ProductList({ products, businessId }: ProductListProps) {
       router.refresh()
     } catch (error) {
       console.error("[v0] Failed to delete product:", error)
-      alert("Failed to delete product")
+      toast.error("Couldn't delete the product", { description: errorMessage(error) })
     } finally {
       setLoading(null)
     }
@@ -78,7 +81,7 @@ export function ProductList({ products, businessId }: ProductListProps) {
       router.refresh()
     } catch (error) {
       console.error("[v0] Failed to update product:", error)
-      alert("Failed to update product")
+      toast.error("Couldn't update the product", { description: errorMessage(error) })
     } finally {
       setLoading(null)
     }
@@ -102,13 +105,9 @@ export function ProductList({ products, businessId }: ProductListProps) {
     setEditError(null)
     setLoading(editing.id)
     try {
-      const price = Number.parseFloat(editForm.price)
-      if (!Number.isFinite(price) || price < 0) {
-        setEditError("Price must be a valid non-negative number.")
-        return
-      }
-      if (!editForm.name.trim()) {
-        setEditError("Name is required.")
+      const checked = validate(productSchema, editForm)
+      if (!checked.ok) {
+        setEditError(checked.error)
         return
       }
 
@@ -116,10 +115,7 @@ export function ProductList({ products, businessId }: ProductListProps) {
       const { error } = await supabase
         .from("products")
         .update({
-          name: editForm.name.trim(),
-          description: editForm.description.trim() || null,
-          price,
-          category: editForm.category.trim() || null,
+          ...checked.data,
           image_url: editForm.imageUrl.trim() || null,
         })
         .eq("id", editing.id)

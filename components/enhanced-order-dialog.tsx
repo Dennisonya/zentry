@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2, ShoppingBag, Sparkles } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { placeOrder } from "@/lib/orders"
+import { checkoutSchema, validate } from "@/lib/validation"
 import type { User } from "@supabase/supabase-js"
 
 interface Product {
@@ -137,6 +138,18 @@ Order placed via Zentry 🚀`
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    const checked = validate(checkoutSchema, {
+      fullName: formData.customerName,
+      phone: formData.whatsappNumber,
+      address: formData.deliveryAddress,
+      notes: formData.additionalNotes,
+    })
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -157,10 +170,10 @@ Order placed via Zentry 🚀`
       await placeOrder(supabase, {
         businessId,
         lines: [{ productId: product.id, quantity }],
-        customerName: formData.customerName,
-        customerPhone: formData.whatsappNumber,
-        deliveryAddress: formData.deliveryAddress,
-        notes: formData.additionalNotes,
+        customerName: checked.data.fullName,
+        customerPhone: checked.data.phone,
+        deliveryAddress: checked.data.address,
+        notes: checked.data.notes,
       })
 
       if (whatsappNumber) {

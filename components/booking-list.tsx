@@ -18,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { formatDistanceToNow } from "date-fns"
 import { CheckCircle, XCircle, Clock, MessageCircle, CheckCheck } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
 
 interface Booking {
   id: string
@@ -88,7 +90,7 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
       router.refresh()
     } catch (err) {
       console.error("Failed to update booking status:", err)
-      alert("Failed to update booking. Please try again.")
+      toast.error("Couldn't update the booking", { description: errorMessage(err) })
     } finally {
       setLoading(null)
     }
@@ -145,7 +147,7 @@ export function BookingList({ bookings, businessId, whatsappNumber, onRecordsCha
       router.refresh()
     } catch (err) {
       console.error("Failed to reschedule booking:", err)
-      alert("Failed to reschedule. Please try again.")
+      toast.error("Couldn't reschedule the booking", { description: errorMessage(err) })
     } finally {
       setLoading(null)
     }

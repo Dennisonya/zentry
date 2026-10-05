@@ -20,6 +20,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { inquirySchema, validate } from "@/lib/validation"
 
 interface ServiceInquiryDialogProps {
   open: boolean
@@ -97,6 +98,13 @@ export function ServiceInquiryDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    const checked = validate(inquirySchema, formData)
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -112,7 +120,7 @@ export function ServiceInquiryDialog({
         return
       }
 
-      const customerWhatsApp = formData.whatsapp.replace(/[^0-9]/g, "")
+      const customerWhatsApp = checked.data.whatsapp.replace(/[^0-9]/g, "")
 
       const now = new Date()
       const pad2 = (n: number) => String(n).padStart(2, "0")
@@ -155,7 +163,7 @@ export function ServiceInquiryDialog({
       const { error: insertError } = await supabase.from("bookings").insert({
         business_id: businessId,
         customer_id: currentUser.id,
-        customer_name: formData.name,
+        customer_name: checked.data.name,
         customer_phone: customerWhatsApp,
         service_id: serviceId,
         booking_date: bookingDate,

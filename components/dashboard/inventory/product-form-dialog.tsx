@@ -20,6 +20,7 @@ import { AlertCircle, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { CategoryField } from "@/components/dashboard/inventory/category-field"
 import type { Product } from "@/components/dashboard-content"
+import { productSchema, stockSchema, validate, variantStockSchema } from "@/lib/validation"
 
 interface VariantRow {
   size: string
@@ -219,23 +220,43 @@ export function ProductFormDialog({
     e.preventDefault()
     setError(null)
 
-    if (!form.hasVariants && form.trackInventory && form.stockQuantity.trim() === "") {
-      setError("Enter a starting stock quantity, or turn off stock tracking.")
+    const details = validate(productSchema, form)
+    if (!details.ok) {
+      setError(details.error)
       return
+    }
+
+    let stock: { stockQuantity: number; lowStockThreshold: number } | null = null
+    if (!form.hasVariants && form.trackInventory) {
+      if (form.stockQuantity.trim() === "") {
+        setError("Enter a starting stock quantity, or turn off stock tracking.")
+        return
+      }
+      const checked = validate(stockSchema, form)
+      if (!checked.ok) {
+        setError(checked.error)
+        return
+      }
+      stock = checked.data
     }
 
     const cleanVariants = form.hasVariants
       ? variants.filter((v) => v.size.trim() || v.color.trim())
       : []
+    const variantRows: { size: string | null; color: string | null; stockQuantity: number; lowStockThreshold: number | null }[] = []
 
     if (form.hasVariants) {
       if (cleanVariants.length === 0) {
         setError("Add at least one size or color option, or turn off variants.")
         return
       }
-      if (cleanVariants.some((v) => v.stockQuantity.trim() === "")) {
-        setError("Enter a stock quantity for every size/color option.")
-        return
+      for (const v of cleanVariants) {
+        const checked = validate(variantStockSchema, v)
+        if (!checked.ok) {
+          setError(checked.error)
+          return
+        }
+        variantRows.push({ size: v.size.trim() || null, color: v.color.trim() || null, ...checked.data })
       }
     }
 
@@ -244,19 +265,12 @@ export function ProductFormDialog({
       const supabase = getSupabaseClient() as any
 
       const payload = {
-        name: form.name,
-        description: form.description || null,
-        price: Number.parseFloat(form.price),
-        category: form.category.trim() || null,
+        ...details.data,
         image_url: images[0] || form.imageUrl || null,
         has_variants: form.hasVariants,
         track_inventory: form.hasVariants ? false : form.trackInventory,
-        stock_quantity: form.hasVariants ? null : form.trackInventory ? Number.parseInt(form.stockQuantity, 10) : null,
-        low_stock_threshold: form.hasVariants
-          ? null
-          : form.trackInventory
-            ? Number.parseInt(form.lowStockThreshold || "5", 10)
-            : null,
+        stock_quantity: stock ? stock.stockQuantity : null,
+        low_stock_threshold: stock ? stock.lowStockThreshold : null,
       }
 
       let productId: string
@@ -283,14 +297,14 @@ export function ProductFormDialog({
       }
 
       await supabase.from("product_variants").delete().eq("product_id", productId)
-      if (form.hasVariants && cleanVariants.length > 0) {
+      if (variantRows.length > 0) {
         await supabase.from("product_variants").insert(
-          cleanVariants.map((v) => ({
+          variantRows.map((v) => ({
             product_id: productId,
-            size: v.size.trim() || null,
-            color: v.color.trim() || null,
-            stock_quantity: Number.parseInt(v.stockQuantity || "0", 10),
-            low_stock_threshold: v.lowStockThreshold.trim() ? Number.parseInt(v.lowStockThreshold, 10) : null,
+            size: v.size,
+            color: v.color,
+            stock_quantity: v.stockQuantity,
+            low_stock_threshold: v.lowStockThreshold,
           })),
         )
       }

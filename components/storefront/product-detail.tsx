@@ -17,6 +17,7 @@ import { getContrastTextColor } from "@/lib/color-contrast"
 import { getStockStatus, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
 import type { Business, Product } from "@/components/business-layouts"
 import { FavoriteButton } from "@/components/favorite-button"
+import { StoreImage } from "@/components/store-image"
 
 interface ProductImageRow {
   id: string
@@ -124,9 +125,9 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-2 lg:px-8">
         <div>
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl border bg-muted">
+          <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border bg-muted">
             {gallery.length > 0 ? (
-              <img src={gallery[activeImage]} alt={product.name} className="h-full w-full object-contain" />
+              <StoreImage src={gallery[activeImage]} alt={product.name} sizes="(min-width: 768px) 50vw, 100vw" priority className="object-contain" />
             ) : (
               <ShoppingCart className="h-16 w-16 text-muted-foreground/40" />
             )}
@@ -137,11 +138,11 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
                 <button
                   key={url + i}
                   onClick={() => setActiveImage(i)}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === activeImage ? "" : "border-transparent opacity-70 hover:opacity-100"}`}
+                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === activeImage ? "" : "border-transparent opacity-70 hover:opacity-100"}`}
                   style={i === activeImage ? { borderColor: accentColor } : undefined}
                   aria-label={`View image ${i + 1}`}
                 >
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <StoreImage src={url} alt="" sizes="64px" className="object-cover" />
                 </button>
               ))}
             </div>

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import { getSupabaseClient } from "@/lib/supabase"
+import { profileSchema, validate } from "@/lib/validation"
 import { DashboardSubpageLayout } from "@/components/dashboard-subpage-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -67,14 +68,19 @@ export default function AccountSettingsPage() {
     if (!user) return
     setError(null)
     setSuccess(false)
+    const checked = validate(profileSchema, form)
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
     setSaving(true)
     try {
       const supabase = getSupabaseClient()
       const { error: upErr } = await supabase.from("profiles").upsert({
         id: user.id,
-        full_name: form.fullName.trim() || null,
-        phone: form.phone.trim() || null,
-        address: form.address.trim() || null,
+        full_name: checked.data.fullName,
+        phone: checked.data.phone,
+        address: checked.data.address,
         updated_at: new Date().toISOString(),
       })
       if (upErr) throw upErr

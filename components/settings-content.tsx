@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { businessDetailsSchema, validate } from "@/lib/validation"
 import { type LayoutStyle } from "@/lib/layouts"
 import { STOREFRONT_FONTS } from "@/lib/storefront-fonts"
 
@@ -62,6 +63,14 @@ export function SettingsContent({ business }: SettingsContentProps) {
     e.preventDefault()
     setError(null)
     setSuccess(false)
+
+    const checked = validate(businessDetailsSchema, formData)
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+    const details = checked.data
+
     setLoading(true)
 
     try {
@@ -70,18 +79,18 @@ export function SettingsContent({ business }: SettingsContentProps) {
       const { error: updateError } = await supabase
         .from("businesses")
         .update({
-          business_name: formData.businessName,
-          phone: formData.phone || null,
-          email: formData.email || null,
-          address: formData.address || null,
-          description: formData.description || null,
+          business_name: details.businessName,
+          phone: details.phone,
+          email: details.email,
+          address: details.address,
+          description: details.description,
           theme_color: formData.themeColor,
           accent_color: formData.accentColor,
           layout_style: formData.layoutStyle,
           dark_mode_enabled: formData.darkModeEnabled,
           font_family: formData.fontFamily,
-          whatsapp_number: formData.whatsappNumber || null,
-          instagram_handle: formData.instagramHandle || null,
+          whatsapp_number: details.whatsappNumber,
+          instagram_handle: details.instagramHandle,
         })
         .eq("id", business.id)
 

@@ -22,6 +22,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { AlertCircle, Pencil, Plus, Tag, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
 
 type PromotionRow = {
   id: string
@@ -87,19 +89,6 @@ function normalizePromotionRow(row: Record<string, unknown>): PromotionRow {
     applies_to: String(row.applies_to ?? "all"),
     created_at: row.created_at != null ? String(row.created_at) : undefined,
   }
-}
-
-function supabaseErrorMessage(err: unknown): string {
-  if (err && typeof err === "object") {
-    const o = err as Record<string, unknown>
-    const msg = typeof o.message === "string" ? o.message : ""
-    const details = typeof o.details === "string" ? o.details : ""
-    const hint = typeof o.hint === "string" ? o.hint : ""
-    const parts = [msg, details, hint].filter(Boolean)
-    if (parts.length > 0) return parts.join(" — ")
-  }
-  if (err instanceof Error) return err.message
-  return "Something went wrong."
 }
 
 function emptyForm() {
@@ -348,7 +337,7 @@ export function PromotionsManager({ businessId }: { businessId: string }) {
       await load()
       router.refresh()
     } catch (err: unknown) {
-      setError(supabaseErrorMessage(err))
+      setError(errorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -364,7 +353,7 @@ export function PromotionsManager({ businessId }: { businessId: string }) {
       await load()
       router.refresh()
     } catch (err: unknown) {
-      alert(supabaseErrorMessage(err))
+      toast.error("Couldn't delete the promotion", { description: errorMessage(err) })
     } finally {
       setSaving(false)
     }

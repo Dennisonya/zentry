@@ -8,6 +8,7 @@ import { ShoppingCart, Check } from "lucide-react"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { Product } from "@/components/business-layouts"
 import { FavoriteButton } from "@/components/favorite-button"
+import { StoreImage } from "@/components/store-image"
 
 function money(n: number) {
   const x = Number(n)
@@ -44,8 +45,8 @@ export function ProductCard({ product, accentColor, onAddToCart, businessSlug }:
   }
 
   const media = product.image_url && (
-    <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
-      <img src={product.image_url} alt={product.name} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
+    <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
+      <StoreImage src={product.image_url} alt={product.name} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw" className="object-contain transition-transform duration-300 group-hover:scale-105" />
     </div>
   )
 

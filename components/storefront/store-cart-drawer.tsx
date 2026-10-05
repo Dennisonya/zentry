@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { placeOrder as placeOrderRpc, type PlacedOrder } from "@/lib/orders"
 import type { StoreCartItem } from "@/lib/store-cart"
+import { StoreImage } from "@/components/store-image"
+import { checkoutSchema, validate } from "@/lib/validation"
 
 interface StoreCartDrawerProps {
   open: boolean
@@ -100,8 +102,15 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
 
   const placeOrder = async (event: React.FormEvent) => {
     event.preventDefault()
-    setLoading(true)
     setError(null)
+
+    const checked = validate(checkoutSchema, form)
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+
+    setLoading(true)
 
     try {
       const supabase = getSupabaseClient()
@@ -118,10 +127,10 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
       const order = await placeOrderRpc(supabase, {
         businessId,
         lines: items.map((item) => ({ productId: item.productId, variantId: item.variantId, quantity: item.quantity })),
-        customerName: form.fullName,
-        customerPhone: form.phone,
-        deliveryAddress: form.address,
-        notes: form.notes,
+        customerName: checked.data.fullName,
+        customerPhone: checked.data.phone,
+        deliveryAddress: checked.data.address,
+        notes: checked.data.notes,
       })
 
       notifyBusiness(order)
@@ -152,14 +161,14 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
             <div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-lg font-semibold">Your cart</p><p className="text-xs text-muted-foreground">{businessName}</p></div><Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} aria-label="Close cart"><X className="h-5 w-5" /></Button></div>
             <div className="flex-1 overflow-y-auto p-5">
               {success && <Alert className="mb-4 border-green-200 bg-green-50 text-green-900"><AlertDescription>{success} You can track it from your account.</AlertDescription></Alert>}
-              {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
+              {error && !checkoutOpen && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
               {items.length === 0 ? (
                 <div className="flex min-h-[50vh] flex-col items-center justify-center text-center"><ShoppingCart className="mb-4 h-12 w-12 text-muted-foreground/50" /><h3 className="text-lg font-semibold">Your cart is empty</h3><p className="mt-1 max-w-xs text-sm text-muted-foreground">Add a few products from {businessName}, then come back here to check out.</p></div>
               ) : (
                 <div className="space-y-4">
                   {items.map((item) => (
                     <div key={`${item.productId}:${item.variantId ?? "base"}`} className="flex gap-3 rounded-2xl border p-3">
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-muted">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-muted-foreground">No image</div>}</div>
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-muted">{item.imageUrl ? <StoreImage src={item.imageUrl} alt={item.name} sizes="80px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-muted-foreground">No image</div>}</div>
                       <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{item.name}</p>{item.variantLabel && <p className="text-xs text-muted-foreground">{item.variantLabel}</p>}<p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p></div><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRemove(item.productId, item.variantId)}><Trash2 className="h-4 w-4" /></Button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none" onClick={() => onQuantityChange(item.productId, item.quantity - 1, item.variantId)}><Minus className="h-3.5 w-3.5" /></Button><span className="w-8 text-center text-sm font-medium">{item.quantity}</span><Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none" onClick={() => onQuantityChange(item.productId, item.quantity + 1, item.variantId)}><Plus className="h-3.5 w-3.5" /></Button></div><p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p></div></div>
                     </div>
                   ))}
@@ -172,7 +181,7 @@ export function StoreCartDrawer({ open, onOpenChange, businessId, businessName, 
       )}
 
       {checkoutOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4"><div className="w-full max-w-lg rounded-2xl border bg-background shadow-2xl"><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-lg font-semibold">Checkout</p><p className="text-xs text-muted-foreground">{businessName}</p></div><Button variant="ghost" size="icon" onClick={() => setCheckoutOpen(false)}><X className="h-5 w-5" /></Button></div><form onSubmit={placeOrder} className="space-y-5 p-5"><div className="rounded-xl bg-muted/50 p-4 text-sm"><div className="flex items-center justify-between"><span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div></div><div className="space-y-2"><Label htmlFor="checkout-name">Name</Label><Input id="checkout-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="checkout-phone">Phone</Label><Input id="checkout-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="checkout-address">Delivery address</Label><Textarea id="checkout-address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Your saved address" rows={3} required /></div><div className="space-y-2"><Label htmlFor="checkout-notes">Order notes (optional)</Label><Textarea id="checkout-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Anything the business should know?" rows={2} /></div><div className="flex gap-2 pt-1"><Button type="button" variant="outline" className="flex-1" onClick={() => setCheckoutOpen(false)}>Back to cart</Button><Button type="submit" className="flex-1" disabled={loading}>{loading ? "Placing order..." : "Place order"}</Button></div><p className="text-center text-xs text-muted-foreground">Need to change your saved details? <Link href="/account/settings" className="underline">Update your account</Link>.</p></form></div></div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4"><div className="w-full max-w-lg rounded-2xl border bg-background shadow-2xl"><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-lg font-semibold">Checkout</p><p className="text-xs text-muted-foreground">{businessName}</p></div><Button variant="ghost" size="icon" onClick={() => setCheckoutOpen(false)}><X className="h-5 w-5" /></Button></div><form onSubmit={placeOrder} className="space-y-5 p-5">{error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}<div className="rounded-xl bg-muted/50 p-4 text-sm"><div className="flex items-center justify-between"><span>{itemCount} item{itemCount !== 1 ? "s" : ""}</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div></div><div className="space-y-2"><Label htmlFor="checkout-name">Name</Label><Input id="checkout-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="checkout-phone">Phone</Label><Input id="checkout-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required /></div><div className="space-y-2"><Label htmlFor="checkout-address">Delivery address</Label><Textarea id="checkout-address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Your saved address" rows={3} required /></div><div className="space-y-2"><Label htmlFor="checkout-notes">Order notes (optional)</Label><Textarea id="checkout-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Anything the business should know?" rows={2} /></div><div className="flex gap-2 pt-1"><Button type="button" variant="outline" className="flex-1" onClick={() => setCheckoutOpen(false)}>Back to cart</Button><Button type="submit" className="flex-1" disabled={loading}>{loading ? "Placing order..." : "Place order"}</Button></div><p className="text-center text-xs text-muted-foreground">Need to change your saved details? <Link href="/account/settings" className="underline">Update your account</Link>.</p></form></div></div>
       )}
     </>
   )

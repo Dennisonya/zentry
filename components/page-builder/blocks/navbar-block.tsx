@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 import { FavoriteButton } from "@/components/favorite-button"
+import { StoreImage } from "@/components/store-image"
 
 interface NavLink {
   label: string
@@ -62,7 +63,7 @@ export function NavbarBlock({
 
         <a href="#" className="flex shrink-0 items-center gap-2 font-bold">
           {business.logo_url ? (
-            <img src={business.logo_url} alt={business.business_name} className="h-9 w-9 rounded-lg object-cover" />
+            <span className="relative block h-9 w-9 shrink-0 overflow-hidden rounded-lg"><StoreImage src={business.logo_url} alt={business.business_name} sizes="36px" className="object-cover" /></span>
           ) : null}
           <span className="truncate">{business.business_name}</span>
         </a>
