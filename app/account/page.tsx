@@ -49,8 +49,8 @@ export default function AccountPage() {
         supabase.from("businesses").select("id").eq("user_id", user.id).limit(1).maybeSingle(),
       ])
       setProfile(profile as Profile | null)
-      setOrders((orders as OrderRow[]) || [])
-      setBookings((bookings as BookingRow[]) || [])
+      setOrders((orders as unknown as OrderRow[]) || [])
+      setBookings((bookings as unknown as BookingRow[]) || [])
       setHasBusiness(Boolean(business))
       setLoading(false)
     }

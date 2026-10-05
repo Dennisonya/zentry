@@ -35,7 +35,7 @@ interface Booking {
     duration_minutes: number | null
     location: string | null
   } | null
-  price: number | null
+  price?: number | null
 }
 
 interface BookingListProps {

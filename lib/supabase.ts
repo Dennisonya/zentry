@@ -1,7 +1,7 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
 // Singleton Supabase client for client-side usage
-let supabaseClient: ReturnType<typeof createClient> | null = null
+let supabaseClient: SupabaseClient | null = null
 let cachedUrl: string | undefined = undefined
 let cachedKey: string | undefined = undefined
 

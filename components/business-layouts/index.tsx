@@ -60,7 +60,6 @@ const layoutComponents = {
   "neon-dark": NeonDarkLayout,
   "social-card": SocialCardLayout,
   "business-card": BusinessCardLayout,
-  "editorial": EditorialStorefrontLayout,
 } as const
 
 interface BusinessPageWithLayoutProps {
@@ -76,6 +75,6 @@ export function BusinessPageWithLayout({
   services,
   layoutStyle = "classic-card",
 }: BusinessPageWithLayoutProps) {
-  const LayoutComponent = layoutComponents[layoutStyle] || ClassicCardLayout
+  const LayoutComponent = layoutComponents[layoutStyle as keyof typeof layoutComponents] || ClassicCardLayout
   return <LayoutComponent business={business} products={products} services={services} />
 }

@@ -33,23 +33,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # next.config sets typescript.ignoreBuildErrors, and the codebase still has
-      # type errors, so this step reports them without failing the job.
-      # Remove continue-on-error once `npm run typecheck` passes.
       - name: Typecheck
-        id: typecheck
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run typecheck 2>&1 | tee tsc.log
-      - name: Typecheck summary
-        if: always()
-        run: |
-          count=$(grep -c "error TS" tsc.log || true)
-          echo "### TypeScript: ${count} error(s)" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$count" != "0" ]; then
-            echo "::warning title=TypeScript::${count} type error(s); see the Typecheck step log"
-          fi
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
