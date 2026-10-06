@@ -12,9 +12,10 @@ import {
   updateStoreCartQuantity,
   clearStoreCart,
   type StoreCartItem,
+  toastNoMoreStock,
 } from "@/lib/store-cart"
 import { getContrastTextColor } from "@/lib/color-contrast"
-import { getStockStatus, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
+import { getStockStatus, getStorefrontStock, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
 import type { Business, Product } from "@/components/business-layouts"
 import { FavoriteButton } from "@/components/favorite-button"
 import { StoreImage } from "@/components/store-image"
@@ -101,12 +102,18 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
 
   const handleAdd = () => {
     if (!canAdd) return
+    let added: number
     if (product.has_variants && selectedVariant) {
-      addToStoreCart(business.id, product, 1, { id: selectedVariant.id, label: variantLabel(selectedVariant) })
+      added = addToStoreCart(business.id, product, 1, { id: selectedVariant.id, label: variantLabel(selectedVariant) }, Math.max(0, selectedVariant.stock_quantity))
     } else {
-      addToStoreCart(business.id, product, 1)
+      added = addToStoreCart(business.id, product, 1, null, getStorefrontStock(product).remaining)
     }
     syncCart()
+    if (added === 0) {
+      const remaining = selectedVariant ? selectedVariant.stock_quantity : getStorefrontStock(product).remaining
+      toastNoMoreStock(product.name, remaining)
+      return
+    }
     setAdded(true)
     window.setTimeout(() => setAdded(false), 1200)
   }

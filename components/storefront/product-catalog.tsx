@@ -6,6 +6,7 @@ import { ArrowLeft, Search, ShoppingBag } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ProductCard } from "@/components/storefront/product-card"
+import { getStorefrontStock } from "@/lib/product-categories"
 import { StoreCartDrawer } from "@/components/storefront/store-cart-drawer"
 import {
   addToStoreCart,
@@ -14,6 +15,7 @@ import {
   updateStoreCartQuantity,
   clearStoreCart,
   type StoreCartItem,
+  toastNoMoreStock,
 } from "@/lib/store-cart"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { Business, Product } from "@/components/business-layouts"
@@ -62,8 +64,10 @@ export function ProductCatalog({ business, products }: ProductCatalogProps) {
   }, [products, searchQuery, selectedCategory])
 
   const handleAddToCart = (product: Product) => {
-    addToStoreCart(business.id, product)
+    const added = addToStoreCart(business.id, product, 1, null, getStorefrontStock(product).remaining)
+    if (added === 0) toastNoMoreStock(product.name, getStorefrontStock(product).remaining)
     syncCart()
+    return added > 0
   }
 
   return (

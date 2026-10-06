@@ -50,7 +50,8 @@ export interface BlockRenderProps<T extends BlockType> {
   business: Business
   products: Product[]
   services: Service[]
-  onAddToCart: (product: Product) => void
+  /** Returns false when nothing was added (sold out, or all remaining stock is already in the cart). */
+  onAddToCart: (product: Product) => boolean | void
   onBookService: (service: Service) => void
   /** Total items currently in the storefront cart — drives the navbar's cart badge. */
   cartItemCount: number

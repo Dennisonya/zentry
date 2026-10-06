@@ -22,7 +22,7 @@ export default async function BusinessPageRoute({ params }: PageProps) {
   // Fetch products for this business
   const { data: products } = await supabase
     .from("products")
-    .select("*")
+    .select("*, product_variants(stock_quantity, low_stock_threshold)")
     .eq("business_id", business.id)
     .eq("is_available", true)
     .order("created_at", { ascending: false })

@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -58,7 +60,18 @@ const STOCK_BADGE: Record<StockStatus, { label: string; className: string }> = {
   "not-tracked": { label: "Not tracked", className: "bg-muted text-muted-foreground" },
 }
 
-export function InventoryContent({ business, products, onProductsChange, autoOpenAdd }: InventoryContentProps) {
+export function InventoryContent({ business, products: loadedProducts, onProductsChange, autoOpenAdd }: InventoryContentProps) {
+  // Stock written by the +/- stepper, shown until the refreshed product list
+  // arrives. Without it a quick second click starts from the old number,
+  // writes the same value again and fires the same alert twice.
+  const [stockOverrides, setStockOverrides] = useState<Record<string, number>>({})
+  const stockOverridesRef = useRef(stockOverrides)
+  stockOverridesRef.current = stockOverrides
+  useEffect(() => setStockOverrides({}), [loadedProducts])
+  const products = useMemo(
+    () => loadedProducts.map((p) => (p.id in stockOverrides ? { ...p, stock_quantity: stockOverrides[p.id] } : p)),
+    [loadedProducts, stockOverrides],
+  )
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
@@ -142,12 +155,19 @@ export function InventoryContent({ business, products, onProductsChange, autoOpe
 
   const adjustStock = async (product: Product, delta: number) => {
     if (!product.track_inventory || product.stock_quantity === null) return
-    const stockBefore = product.stock_quantity
+    const stockBefore = stockOverridesRef.current[product.id] ?? product.stock_quantity
     const next = Math.max(0, stockBefore + delta)
+    if (next === stockBefore) return
     setPendingStockId(product.id)
     try {
       const supabase = getSupabaseClient() as any
-      await supabase.from("products").update({ stock_quantity: next }).eq("id", product.id)
+      const { error } = await supabase.from("products").update({ stock_quantity: next }).eq("id", product.id)
+      if (error) {
+        toast.error("Couldn't update stock", { description: errorMessage(error) })
+        return
+      }
+      stockOverridesRef.current = { ...stockOverridesRef.current, [product.id]: next }
+      setStockOverrides(stockOverridesRef.current)
       await checkAndNotifyLowStock({
         businessId: business.id,
         productId: product.id,
@@ -399,8 +419,8 @@ export function InventoryContent({ business, products, onProductsChange, autoOpe
                   {status === "out" && product.is_available && (
                     <div className="flex items-center gap-2 border-t bg-red-50 px-4 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-400">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                      Out of stock and still visible on your storefront. Hide it from the menu above if you don't
-                      want customers to order it.
+                      Out of stock. Customers see it as sold out and can't order it until you add stock. Hide it from
+                      the menu above to remove it from your storefront.
                     </div>
                   )}
                 </Card>

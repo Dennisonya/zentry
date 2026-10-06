@@ -99,6 +99,34 @@ export function getProductStockSummary(
   return "in-stock"
 }
 
+/**
+ * Stock as a storefront shopper sees it, for any product row: its status and
+ * how many can still be bought (null when the product doesn't track stock).
+ * Variant products need their `product_variants` rows loaded; without them
+ * the product is treated as not tracked here and the detail page decides.
+ */
+export function getStorefrontStock(product: {
+  has_variants?: boolean | null
+  track_inventory?: boolean | null
+  stock_quantity?: number | null
+  low_stock_threshold?: number | null
+  product_variants?: Pick<ProductVariant, "stock_quantity" | "low_stock_threshold">[] | null
+}): { status: StockStatus; remaining: number | null } {
+  if (product.has_variants) {
+    const variants = product.product_variants ?? []
+    if (variants.length === 0) return { status: "not-tracked", remaining: null }
+    const status = getProductStockSummary(variants as ProductVariant[], product.low_stock_threshold ?? null)
+    const remaining = variants.reduce((sum, v) => sum + Math.max(0, v.stock_quantity), 0)
+    return { status, remaining }
+  }
+  const status = getStockStatus({
+    track_inventory: !!product.track_inventory,
+    stock_quantity: product.stock_quantity ?? null,
+    low_stock_threshold: product.low_stock_threshold ?? null,
+  })
+  return { status, remaining: status === "not-tracked" ? null : Math.max(0, product.stock_quantity ?? 0) }
+}
+
 /** A short "White / Large" style label for a variant, for cart lines and pickers. */
 export function variantLabel(variant: { size?: string | null; color?: string | null }): string {
   return [variant.color, variant.size].filter(Boolean).join(" / ")

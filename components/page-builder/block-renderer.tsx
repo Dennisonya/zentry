@@ -13,7 +13,8 @@ interface BlockRendererProps {
   products: Product[]
   services: Service[]
   showHidden?: boolean
-  onAddToCart: (product: Product) => void
+  /** Returns false when nothing was added (sold out, or all remaining stock is already in the cart). */
+  onAddToCart: (product: Product) => boolean | void
   cartItemCount: number
   onCartOpen: () => void
 }
