@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { StoreImage } from "@/components/store-image"
 
 export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
   const body = settings.body || business.description
@@ -20,8 +21,8 @@ export function AboutBlock({ business, settings }: BlockRenderProps<"about">) {
         }`}
       >
         {showImage ? (
-          <div className="aspect-square overflow-hidden md:aspect-auto md:h-full">
-            <img src={imageUrl!} alt="" className="h-full w-full object-cover" />
+          <div className="relative aspect-square overflow-hidden md:aspect-auto md:h-full md:min-h-[320px]">
+            <StoreImage src={imageUrl!} alt="" sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
           </div>
         ) : null}
 

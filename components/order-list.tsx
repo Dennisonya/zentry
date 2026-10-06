@@ -8,6 +8,8 @@ import { formatDistanceToNow } from "date-fns"
 import { CheckCircle, XCircle, CheckCheck, ChevronRight } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
 import { OrderDetailModal, type Order } from "@/components/order-detail-modal"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
 
 interface OrderListProps {
   orders: Order[]
@@ -99,8 +101,8 @@ export function OrderList({ orders: initialOrders, businessId }: OrderListProps)
       )
 
       router.refresh()
-    } catch {
-      alert("Failed to update order.")
+    } catch (err) {
+      toast.error("Couldn't update the order", { description: errorMessage(err) })
     } finally {
       setLoadingId(null)
     }

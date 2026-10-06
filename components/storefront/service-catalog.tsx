@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ServiceInquiryDialog } from "@/components/service-inquiry-dialog"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { Business, Service } from "@/components/business-layouts"
+import { StoreImage } from "@/components/store-image"
 
 function money(n: number) {
   const x = Number(n)
@@ -116,8 +117,8 @@ export function ServiceCatalog({ business, services }: ServiceCatalogProps) {
             {filtered.map((service) => (
               <Card key={service.id} className="group overflow-hidden border-border/60 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                 {service.image_url ? (
-                  <div className="aspect-[4/3] overflow-hidden">
-                    <img src={service.image_url} alt={service.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                  <div className="relative aspect-[4/3] overflow-hidden">
+                    <StoreImage src={service.image_url} alt={service.name} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
                   </div>
                 ) : (
                   <div className="grid aspect-[4/3] place-items-center bg-muted">

@@ -18,6 +18,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2, ShoppingBag, Sparkles } from "lucide-react"
 import { getSupabaseClient } from "@/lib/supabase"
+import { placeOrder } from "@/lib/orders"
+import { checkoutSchema, validate } from "@/lib/validation"
 import type { User } from "@supabase/supabase-js"
 
 interface Product {
@@ -136,6 +138,18 @@ Order placed via Zentry 🚀`
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    const checked = validate(checkoutSchema, {
+      fullName: formData.customerName,
+      phone: formData.whatsappNumber,
+      address: formData.deliveryAddress,
+      notes: formData.additionalNotes,
+    })
+    if (!checked.ok) {
+      setError(checked.error)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -151,31 +165,16 @@ Order placed via Zentry 🚀`
         return
       }
 
-      const orderData = {
-        business_id: businessId,
-        customer_id: currentUser.id,
-        customer_name: formData.customerName,
-        customer_phone: formData.whatsappNumber,
-        total_amount: totalAmount,
-        status: "pending",
-        order_items: [
-          {
-            product_id: product.id,
-            product_name: product.name,
-            price: product.price,
-            quantity: quantity,
-            image_url: product.image_url,
-            original_price: product.original_price ?? null,
-            promotion_badge: product.promotion_badge ?? null,
-          },
-        ],
-        delivery_address: formData.deliveryAddress,
-        additional_notes: formData.additionalNotes,
-        inquiry_type: "order",
-      }
-
-      const { error: insertError } = await supabase.from("orders").insert(orderData)
-      if (insertError) throw insertError
+      // The database prices the order (including any live promotion) and
+      // takes the stock; the dialog only sends the product and quantity.
+      await placeOrder(supabase, {
+        businessId,
+        lines: [{ productId: product.id, quantity }],
+        customerName: checked.data.fullName,
+        customerPhone: checked.data.phone,
+        deliveryAddress: checked.data.address,
+        notes: checked.data.notes,
+      })
 
       if (whatsappNumber) {
         await sendWhatsAppNotification({

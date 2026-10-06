@@ -12,10 +12,13 @@ import {
   updateStoreCartQuantity,
   clearStoreCart,
   type StoreCartItem,
+  toastNoMoreStock,
 } from "@/lib/store-cart"
 import { getContrastTextColor } from "@/lib/color-contrast"
-import { getStockStatus, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
+import { getStockStatus, getStorefrontStock, getVariantStockStatus, variantLabel, type ProductVariant } from "@/lib/product-categories"
 import type { Business, Product } from "@/components/business-layouts"
+import { FavoriteButton } from "@/components/favorite-button"
+import { StoreImage } from "@/components/store-image"
 
 interface ProductImageRow {
   id: string
@@ -99,12 +102,18 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
 
   const handleAdd = () => {
     if (!canAdd) return
+    let added: number
     if (product.has_variants && selectedVariant) {
-      addToStoreCart(business.id, product, 1, { id: selectedVariant.id, label: variantLabel(selectedVariant) })
+      added = addToStoreCart(business.id, product, 1, { id: selectedVariant.id, label: variantLabel(selectedVariant) }, Math.max(0, selectedVariant.stock_quantity))
     } else {
-      addToStoreCart(business.id, product, 1)
+      added = addToStoreCart(business.id, product, 1, null, getStorefrontStock(product).remaining)
     }
     syncCart()
+    if (added === 0) {
+      const remaining = selectedVariant ? selectedVariant.stock_quantity : getStorefrontStock(product).remaining
+      toastNoMoreStock(product.name, remaining)
+      return
+    }
     setAdded(true)
     window.setTimeout(() => setAdded(false), 1200)
   }
@@ -123,9 +132,9 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-2 lg:px-8">
         <div>
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl border bg-muted">
+          <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border bg-muted">
             {gallery.length > 0 ? (
-              <img src={gallery[activeImage]} alt={product.name} className="h-full w-full object-contain" />
+              <StoreImage src={gallery[activeImage]} alt={product.name} sizes="(min-width: 768px) 50vw, 100vw" priority className="object-contain" />
             ) : (
               <ShoppingCart className="h-16 w-16 text-muted-foreground/40" />
             )}
@@ -136,11 +145,11 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
                 <button
                   key={url + i}
                   onClick={() => setActiveImage(i)}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === activeImage ? "" : "border-transparent opacity-70 hover:opacity-100"}`}
+                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${i === activeImage ? "" : "border-transparent opacity-70 hover:opacity-100"}`}
                   style={i === activeImage ? { borderColor: accentColor } : undefined}
                   aria-label={`View image ${i + 1}`}
                 >
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <StoreImage src={url} alt="" sizes="64px" className="object-cover" />
                 </button>
               ))}
             </div>
@@ -201,9 +210,10 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
             <p className="mt-4 text-sm text-muted-foreground">That combination isn't available.</p>
           )}
 
+          <div className="mt-6 flex items-center gap-3">
           <Button
             size="lg"
-            className="mt-6 w-full rounded-full sm:w-auto"
+            className="flex-1 rounded-full sm:flex-none"
             style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }}
             onClick={handleAdd}
             disabled={!canAdd}
@@ -211,6 +221,8 @@ export function ProductDetail({ business, product, images, variants }: ProductDe
             {added ? <Check className="mr-2 h-4 w-4" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
             {added ? "Added" : canAdd ? "Add to cart" : "Unavailable"}
           </Button>
+          <FavoriteButton kind="product" id={product.id} name={product.name} className="h-11 w-11 shrink-0 border" />
+          </div>
         </div>
       </div>
 

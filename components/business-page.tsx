@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { BlockRenderer } from "@/components/page-builder/block-renderer"
 import { convertLayoutToSchema } from "@/lib/page-builder/layout-to-blocks"
+import { getStorefrontStock } from "@/lib/product-categories"
 import { StoreCartDrawer } from "@/components/storefront/store-cart-drawer"
 import { getGoogleFontUrl } from "@/lib/storefront-fonts"
 import {
@@ -12,6 +13,7 @@ import {
   updateStoreCartQuantity,
   clearStoreCart,
   type StoreCartItem,
+  toastNoMoreStock,
 } from "@/lib/store-cart"
 import type { PageSchema } from "@/lib/page-builder/types"
 import type { Product, Service } from "@/components/business-layouts"
@@ -82,8 +84,10 @@ export function BusinessPage({ business, products, services }: BusinessPageProps
   }, [business.font_family])
 
   const addProduct = (product: Product) => {
-    addToStoreCart(business.id, product)
+    const added = addToStoreCart(business.id, product, 1, null, getStorefrontStock(product).remaining)
+    if (added === 0) toastNoMoreStock(product.name, getStorefrontStock(product).remaining)
     syncCart()
+    return added > 0
   }
 
   const changeQuantity = (productId: string, quantity: number, variantId: string | null = null) => {

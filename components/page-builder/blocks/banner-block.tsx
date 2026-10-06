@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { StoreImage } from "@/components/store-image"
 
 export function BannerBlock({ business, settings }: BlockRenderProps<"banner">) {
   const accentColor = business.accent_color || business.theme_color
@@ -18,7 +19,7 @@ export function BannerBlock({ business, settings }: BlockRenderProps<"banner">) 
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
-            <img src={settings.mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <StoreImage src={settings.mediaUrl} alt="" sizes="(min-width: 1280px) 1280px, 100vw" className="object-cover" />
           )
         ) : (
           <div className="absolute inset-0" style={{ backgroundColor: accentColor }} />

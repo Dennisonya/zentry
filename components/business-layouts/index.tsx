@@ -38,6 +38,11 @@ export interface Product {
   category: string | null
   created_at?: string | null
   has_variants?: boolean
+  track_inventory?: boolean | null
+  stock_quantity?: number | null
+  low_stock_threshold?: number | null
+  /** Loaded by storefront pages so cards can show variant stock. */
+  product_variants?: { stock_quantity: number; low_stock_threshold: number | null }[] | null
 }
 
 export interface Service {

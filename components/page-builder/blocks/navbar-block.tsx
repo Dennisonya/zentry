@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Search, Heart, ShoppingBag, Menu, X } from "lucide-react"
+import { Search, ShoppingBag, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { FavoriteButton } from "@/components/favorite-button"
+import { StoreImage } from "@/components/store-image"
 
 interface NavLink {
   label: string
@@ -62,7 +63,7 @@ export function NavbarBlock({
 
         <a href="#" className="flex shrink-0 items-center gap-2 font-bold">
           {business.logo_url ? (
-            <img src={business.logo_url} alt={business.business_name} className="h-9 w-9 rounded-lg object-cover" />
+            <span className="relative block h-9 w-9 shrink-0 overflow-hidden rounded-lg"><StoreImage src={business.logo_url} alt={business.business_name} sizes="36px" className="object-cover" /></span>
           ) : null}
           <span className="truncate">{business.business_name}</span>
         </a>
@@ -95,11 +96,7 @@ export function NavbarBlock({
             </div>
           )}
 
-          <Button variant="ghost" size="icon" asChild aria-label="Favorites">
-            <Link href="/account/favorites">
-              <Heart className="h-[18px] w-[18px]" />
-            </Link>
-          </Button>
+          <FavoriteButton kind="business" id={business.id} name={business.business_name} className="h-10 w-10" />
 
           {settings.showCart && (
             <Button variant="ghost" size="icon" className="relative" onClick={onCartOpen} aria-label="Cart">

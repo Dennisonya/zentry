@@ -8,6 +8,9 @@ import { ShoppingCart, Check, CalendarDays } from "lucide-react"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
 import type { Product, Service } from "@/components/business-layouts"
+import { StoreImage } from "@/components/store-image"
+import { StockBadge } from "@/components/storefront/product-card"
+import { getStorefrontStock } from "@/lib/product-categories"
 
 function money(n: number) {
   const x = Number(n)
@@ -70,20 +73,31 @@ export function PopularBlock({ business, products, services, settings, onAddToCa
             className="w-[70vw] shrink-0 snap-start overflow-hidden border-border/60 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-auto"
           >
             {entry.image_url && (
-              <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
-                <img src={entry.image_url} alt={entry.name} className="h-full w-full object-contain" />
+              <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-muted">
+                <StoreImage src={entry.image_url} alt={entry.name} sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 70vw" className={`object-contain ${entry.kind === "product" && getStorefrontStock(entry).status === "out" ? "opacity-50 grayscale" : ""}`} />
+                {entry.kind === "product" && (
+                  <StockBadge status={getStorefrontStock(entry).status} remaining={getStorefrontStock(entry).remaining} hasVariants={!!entry.has_variants} />
+                )}
               </div>
             )}
             <CardContent className="p-4">
               <h3 className="mb-1 truncate font-semibold">{entry.name}</h3>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-bold">${money(entry.price)}</span>
-                {entry.kind === "product" ? (
+                {entry.kind === "product" && getStorefrontStock(entry).status === "out" ? (
+                  <Button size="sm" variant="outline" disabled>
+                    Sold out
+                  </Button>
+                ) : entry.kind === "product" && entry.has_variants ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/${business.slug}/products/${entry.id}`}>Select</Link>
+                  </Button>
+                ) : entry.kind === "product" ? (
                   <Button
                     size="sm"
                     style={{ backgroundColor: accentColor, color: buttonTextColor }}
                     onClick={() => {
-                      onAddToCart(entry)
+                      if (onAddToCart(entry) === false) return
                       setAddedId(entry.id)
                       window.setTimeout(() => setAddedId((c) => (c === entry.id ? null : c)), 1200)
                     }}

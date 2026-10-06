@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { CalendarDays } from "lucide-react"
 import { getContrastTextColor } from "@/lib/color-contrast"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { StoreImage } from "@/components/store-image"
 
 function money(n: number) {
   const x = Number(n)
@@ -24,7 +25,7 @@ export function ServiceGridBlock({ business, services, settings, onBookService }
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((service) => (
           <article key={service.id} className="group overflow-hidden rounded-2xl border bg-background transition-shadow hover:shadow-xl">
-            {service.image_url ? <div className="aspect-[4/3] overflow-hidden"><img src={service.image_url} alt={service.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" /></div> : <div className="grid aspect-[4/3] place-items-center bg-muted"><CalendarDays className="h-8 w-8 text-muted-foreground" /></div>}
+            {service.image_url ? <div className="relative aspect-[4/3] overflow-hidden"><StoreImage src={service.image_url} alt={service.name} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" /></div> : <div className="grid aspect-[4/3] place-items-center bg-muted"><CalendarDays className="h-8 w-8 text-muted-foreground" /></div>}
             <div className="p-5"><div className="flex items-start justify-between gap-4"><h3 className="font-semibold">{service.name}</h3><span className="text-sm font-semibold">${money(service.price)}</span></div>{service.description && <p className="mt-2 text-sm leading-6 text-muted-foreground">{service.description}</p>}{service.duration_minutes != null && <p className="mt-3 text-xs text-muted-foreground">{service.duration_minutes} min</p>}<Button onClick={() => onBookService(service)} style={{ backgroundColor: accentColor, color: getContrastTextColor(accentColor) }} className="mt-5 w-full rounded-full">Book service</Button></div>
           </article>
         ))}

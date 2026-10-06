@@ -1,5 +1,6 @@
 import { Instagram, MessageCircle } from "lucide-react"
 import type { BlockRenderProps } from "@/lib/page-builder/block-registry"
+import { StoreImage } from "@/components/store-image"
 
 export function FooterBlock({ business, products, services, settings }: BlockRenderProps<"footer">) {
   return (
@@ -7,7 +8,7 @@ export function FooterBlock({ business, products, services, settings }: BlockRen
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-3">
-            {business.logo_url && <img src={business.logo_url} alt="" className="h-9 w-9 rounded-full object-cover" />}
+            {business.logo_url && <span className="relative block h-9 w-9 shrink-0 overflow-hidden rounded-full"><StoreImage src={business.logo_url} alt="" sizes="36px" className="object-cover" /></span>}
             <span className="font-semibold">{business.business_name}</span>
           </div>
           {business.description && (

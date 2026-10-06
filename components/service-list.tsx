@@ -18,6 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
+import { serviceSchema, validate } from "@/lib/validation"
 
 interface Service {
   id: string
@@ -63,7 +66,7 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
       router.refresh()
     } catch (error) {
       console.error("[v0] Failed to delete service:", error)
-      alert("Failed to delete service")
+      toast.error("Couldn't delete the service", { description: errorMessage(error) })
     } finally {
       setLoading(null)
     }
@@ -82,7 +85,7 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
       router.refresh()
     } catch (error) {
       console.error("[v0] Failed to update service:", error)
-      alert("Failed to update service")
+      toast.error("Couldn't update the service", { description: errorMessage(error) })
     } finally {
       setLoading(null)
     }
@@ -108,33 +111,20 @@ export function ServiceList({ services, businessId }: ServiceListProps) {
     setEditError(null)
     setLoading(editing.id)
     try {
-      const price = Number.parseFloat(editForm.price)
-      if (!Number.isFinite(price) || price < 0) {
-        setEditError("Price must be a valid non-negative number.")
+      const checked = validate(serviceSchema, editForm)
+      if (!checked.ok) {
+        setEditError(checked.error)
         return
       }
-      if (!editForm.name.trim()) {
-        setEditError("Name is required.")
-        return
-      }
-      const duration =
-        editForm.durationMinutes.trim() === "" ? null : Number.parseInt(editForm.durationMinutes, 10)
-      if (duration != null && (!Number.isFinite(duration) || duration < 0)) {
-        setEditError("Duration must be a valid non-negative number.")
-        return
-      }
+      const { durationMinutes, ...fields } = checked.data
 
       const supabase = getSupabaseClient()
       const { error } = await supabase
         .from("services")
         .update({
-          name: editForm.name.trim(),
-          description: editForm.description.trim() || null,
-          price,
-          category: editForm.category.trim() || null,
+          ...fields,
           image_url: editForm.imageUrl.trim() || null,
-          duration_minutes: duration,
-          location: editForm.location.trim() || null,
+          duration_minutes: durationMinutes,
         })
         .eq("id", editing.id)
 

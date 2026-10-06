@@ -28,6 +28,8 @@ import {
 import { format, parseISO } from "date-fns"
 import { getSupabaseClient } from "@/lib/supabase"
 import { generateConfirmationToken } from "@/lib/otp"
+import { toast } from "sonner"
+import { errorMessage } from "@/lib/errors"
 
 interface OrderItem {
   product_id?: string
@@ -111,8 +113,8 @@ export function OrderDetailModal({ order, open, onOpenChange, onOrderUpdated }: 
       const base = typeof window !== "undefined" ? window.location.origin : ""
       setConfirmUrl(`${base}/confirm-order?token=${token}`)
       setShowQR(true)
-    } catch {
-      alert("Could not generate QR code. Please try again.")
+    } catch (err) {
+      toast.error("Couldn't generate the QR code", { description: errorMessage(err) })
     } finally {
       setLoading(null)
     }
@@ -132,8 +134,8 @@ export function OrderDetailModal({ order, open, onOpenChange, onOrderUpdated }: 
       if (error) throw error
       onOrderUpdated({ ...order, status: "completed", confirmed_at: now })
       router.refresh()
-    } catch {
-      alert("Failed to update order. Please try again.")
+    } catch (err) {
+      toast.error("Couldn't update the order", { description: errorMessage(err) })
     } finally {
       setLoading(null)
     }

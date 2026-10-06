@@ -5,7 +5,11 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    // Storefront uploads live in Supabase Storage; next/image (via
+    // components/store-image.tsx) serves them resized and in modern formats.
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/public/**' },
+    ],
   },
 }
 
